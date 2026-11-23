@@ -1,5 +1,6 @@
 #pragma once
-#include "dev/bureaucracy.h"
+#include "utils/exceptions.hpp"
+#include "utils/constants.hpp"
 
 #include "dev/class method interface/abstract class methods/modifier_methods.h"
 #include "dev/class method interface/linked list methods/linked_list_specific.h"

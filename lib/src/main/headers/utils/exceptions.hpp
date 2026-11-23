@@ -1,23 +1,54 @@
 #pragma once
-#include <stdio.h>
-#include <stdlib.h>
-#include <fstream>
-#include <ostream>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <stdexcept>
+#include <string>
 
-#define SZT_ERROR ULLONG_MAX
-#define ERROR_CODE -1
+namespace ds
+{
+	// Thrown when a position lies outside the stored elements.
+	class index_error : public std::out_of_range
+	{
+	public:
+		index_error(const std::string& operation, std::size_t index, std::size_t size)
+			: std::out_of_range(operation + ": index " + std::to_string(index)
+				+ " out of range, size is " + std::to_string(size)) {}
+	};
 
-std::ofstream log_file("stderr log.txt");
-#define print_error(msg) { log_file << msg << '\n'; }
+	// Thrown when an operation needs an element and the structure holds none.
+	class empty_error : public std::out_of_range
+	{
+	public:
+		explicit empty_error(const std::string& operation)
+			: std::out_of_range(operation + ": no element to access, structure is empty") {}
+	};
 
-#define fatal_error(msg) { print_error(msg); exit(ERROR_CODE); }
-#define  hard_error(msg) { print_error(msg); throw(ERROR_CODE); }
-#define  eazy_error(msg) { print_error(msg); }
+	// Thrown when a lookup asks for a key the structure does not hold.
+	class key_error : public std::out_of_range
+	{
+	public:
+		explicit key_error(const std::string& operation)
+			: std::out_of_range(operation + ": key not found") {}
+	};
 
-#define FOR(n) for(size_t i = 0; i < n; i++)
+	// Thrown when a requested capacity exceeds what the structure can allocate.
+	class capacity_error : public std::length_error
+	{
+	public:
+		capacity_error(const std::string& operation, std::size_t requested, std::size_t maximum)
+			: std::length_error(operation + ": capacity " + std::to_string(requested)
+				+ " exceeds the maximum of " + std::to_string(maximum)) {}
+	};
 
-typedef signed char bit;
-
-#define structure_typedefs typedef const size_t& szt;\
-	typedef const T& t;\
-	typedef bool (*fct)(t, t);
+	namespace detail
+	{
+		// The single terminate path, for states where continuing would be undefined behaviour.
+		[[noreturn]] inline void fail_fast(const char* message) noexcept
+		{
+			std::fputs(message, stderr);
+			std::fputc('\n', stderr);
+			std::abort();
+		}
+	}
+}

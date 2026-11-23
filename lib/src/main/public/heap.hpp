@@ -1,5 +1,6 @@
 #pragma once
-#include "bureaucracy.h"
+#include "utils/exceptions.hpp"
+#include "utils/constants.hpp"
 #include <initializer_list>
 
 #define default_heap_size 100

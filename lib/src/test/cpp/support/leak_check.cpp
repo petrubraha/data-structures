@@ -2,10 +2,21 @@
 #include <atomic>
 #include <cstdlib>
 #include <new>
+#include <string_view>
 
 namespace
 {
+	// Death test suites end with this suffix; gtest keeps per-process bookkeeping for them in the parent.
+	constexpr std::string_view death_test_suffix = "_death_test";
+
 	std::atomic<std::size_t> allocation_count{ 0 };
+
+	bool is_death_test(const testing::TestInfo& test)
+	{
+		const std::string_view suite = test.test_suite_name();
+		return suite.size() >= death_test_suffix.size()
+			&& suite.substr(suite.size() - death_test_suffix.size()) == death_test_suffix;
+	}
 
 	void* allocate(std::size_t byte_count)
 	{
@@ -72,6 +83,9 @@ namespace ds::test
 
 	void leak_check::OnTestEnd(const testing::TestInfo& test)
 	{
+		if (is_death_test(test))
+			return;
+
 		const std::size_t allocations_at_end = live_allocations();
 		EXPECT_EQ(allocations_at_start, allocations_at_end)
 			<< test.test_suite_name() << '.' << test.name() << " leaked "
