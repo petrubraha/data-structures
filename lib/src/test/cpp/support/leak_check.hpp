@@ -8,6 +8,7 @@ namespace ds::test
 	std::size_t live_allocations() noexcept;
 
 	// Fails the running test when it ends with more live allocations than it started with.
+	// Death test suites, named with a "_death_test" suffix, are skipped.
 	class leak_check : public testing::EmptyTestEventListener
 	{
 	public:

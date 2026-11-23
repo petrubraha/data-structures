@@ -1,5 +1,6 @@
 #pragma once
-#include "bureaucracy.h"
+#include "utils/exceptions.hpp"
+#include "utils/constants.hpp"
 
 #include "node/node_double_list.h"
 
