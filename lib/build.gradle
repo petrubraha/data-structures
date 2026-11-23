@@ -13,7 +13,96 @@ plugins {
     id 'cpp-unit-test'
 }
 
+def googletestVersion = '1.17.0'
+
+// GoogleTest has no Gradle native publication, so its source archive is fetched as an Ivy artifact from GitHub.
+repositories {
+    ivy {
+        url = 'https://github.com'
+        patternLayout {
+            artifact '[organisation]/[module]/archive/refs/tags/v[revision].[ext]'
+        }
+        metadataSources {
+            artifact()
+        }
+        content {
+            includeModule('google', 'googletest')
+        }
+    }
+}
+
+configurations {
+    googletestArchive {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    googletestArchive "google:googletest:${googletestVersion}@zip"
+}
+
+def extractGoogletest = tasks.register('extractGoogletest', Sync) {
+    def archives = project.services.get(ArchiveOperations)
+    from(configurations.googletestArchive.elements.map { files -> files.collect { archives.zipTree(it.asFile) } })
+    into(layout.buildDirectory.dir('googletest'))
+}
+
+def googletestRoot = layout.buildDirectory.dir("googletest/googletest-${googletestVersion}/googletest")
+
 library {
     // Set the target operating system and architecture for this library
     targetMachines.add(machines.windows.x86_64)
+
+    // The library is header-only; a static archive avoids an empty DLL.
+    linkage = [Linkage.STATIC]
+
+    // Public headers include the internal ones, so a consumer needs both directories on its include path.
+    publicHeaders.from('src/main/public', 'src/main/headers')
+}
+
+unitTest {
+    source.from('src/test/cpp', files(googletestRoot.map { it.file('src/gtest-all.cc') }).builtBy(extractGoogletest))
+    privateHeaders.from(files(googletestRoot.map { it.dir('include') }, googletestRoot).builtBy(extractGoogletest))
+}
+
+def isVisualCpp = { toolChain -> toolChain instanceof VisualCpp }
+
+tasks.withType(CppCompile).configureEach {
+    compilerArgs.addAll(toolChain.map { chain ->
+        isVisualCpp(chain)
+            ? ['/std:c++17', '/permissive-', '/Zc:__cplusplus', '/EHsc', '/W4', '/WX']
+            : ['-std=c++17', '-Wall', '-Wextra', '-Wpedantic', '-Werror']
+    })
+}
+
+// The test executable runs under AddressSanitizer (and UndefinedBehaviorSanitizer where the toolchain has it).
+unitTest {
+    binaries.configureEach(CppTestExecutable) { binary ->
+        def visualCpp = isVisualCpp(binary.toolChain)
+        binary.compileTask.get().compilerArgs.addAll(
+            visualCpp ? ['/fsanitize=address'] : ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
+        binary.linkTask.get().linkerArgs.addAll(
+            visualCpp ? ['/INCREMENTAL:NO'] : ['-fsanitize=address,undefined'])
+    }
+}
+
+// The MSVC AddressSanitizer runtime is a DLL next to the compiler; the test process needs it on its PATH.
+def visualStudioInstallation = providers.environmentVariable('ProgramFiles(x86)').flatMap { programFiles ->
+    providers.exec {
+        commandLine("${programFiles}/Microsoft Visual Studio/Installer/vswhere.exe", '-latest', '-property', 'installationPath')
+        ignoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }
+}
+
+def sanitizerRuntimeDirectory = visualStudioInstallation.map { installation ->
+    def visualCpp = new File(installation, 'VC')
+    def toolsVersion = new File(visualCpp, 'Auxiliary/Build/Microsoft.VCToolsVersion.default.txt').text.trim()
+    new File(visualCpp, "Tools/MSVC/${toolsVersion}/bin/Hostx64/x64").absolutePath
+}
+
+tasks.withType(RunTestExecutable).configureEach {
+    if (sanitizerRuntimeDirectory.isPresent()) {
+        environment('PATH', "${sanitizerRuntimeDirectory.get()}${File.pathSeparator}${System.getenv('PATH')}")
+    }
 }
