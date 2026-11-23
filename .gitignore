@@ -1,0 +1,13 @@
+# Kiro planning artifacts
+.kiro/
+
+# Gradle
+.gradle/
+build/
+
+# Build output
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.dll
