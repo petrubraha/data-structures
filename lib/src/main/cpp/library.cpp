@@ -5,3 +5,4 @@
 #include "linked_list.hpp"
 #include "queue.hpp"
 #include "stack.hpp"
+#include "deque.hpp"
