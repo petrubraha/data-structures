@@ -54,6 +54,26 @@ TEST(list_iterator, follows_next_links_of_list_and_deque_nodes)
 	EXPECT_EQ(5, *deque_current);
 }
 
+TEST(list_iterator, converts_from_mutable_to_read_only)
+{
+	list_node only(3);
+	const ds::detail::list_iterator<list_node, int> writer(&only);
+	const list_reader reader = writer;
+
+	EXPECT_EQ(3, *reader);
+	EXPECT_FALSE(reader != writer);
+}
+
+TEST(array_iterator, converts_from_mutable_to_read_only)
+{
+	int values[element_count] = { 4, 5, 6 };
+	const ds::detail::array_iterator<int> writer(values, values + element_count);
+	const ds::detail::array_iterator<const int> reader = writer;
+
+	EXPECT_EQ(4, *reader);
+	EXPECT_FALSE(reader != writer);
+}
+
 TEST(tree_iterator, visits_nodes_in_order)
 {
 	tree_node root(2);
