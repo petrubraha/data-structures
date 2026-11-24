@@ -7,3 +7,4 @@
 #include "stack.hpp"
 #include "deque.hpp"
 #include "heap.hpp"
+#include "tree.hpp"

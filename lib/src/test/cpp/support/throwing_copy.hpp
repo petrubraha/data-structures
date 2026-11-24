@@ -27,6 +27,11 @@ namespace ds::test
 			return number == other.number;
 		}
 
+		bool operator<(const throwing_copy& other) const noexcept
+		{
+			return number < other.number;
+		}
+
 	private:
 		int number;
 	};
