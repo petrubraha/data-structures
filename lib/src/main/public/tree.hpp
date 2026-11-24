@@ -1,722 +1,473 @@
 #pragma once
-#include "utils/exceptions.hpp"
-#include "utils/constants.hpp"
-
-#include "dev/class method interface/abstract class methods/modifier_methods.h"
-#include "dev/class method interface/avl methods/avl_specific.h"
-#include "dev/class method interface/avl methods/avl_constant.h"
-#include "dev/class method interface/avl methods/avl_queries.h"
-#include "dev/class method interface/abstract class methods/instance_synergy.h"
-#include "dev/class method interface/abstract class methods/iterator_methods.h"
-
-#include "dev/iterator/avl_iterator.h"
-
-#include "dev/node/node_avlt.h"
-#include "dev/data_structure.h"
-#include "stack.h"
-#include "queue.h"
+#include <cstddef>
+#include <functional>
 #include <initializer_list>
+#include <iostream>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include "iterator/tree_iterator.hpp"
+#include "node/tree_node.hpp"
+#include "policy/balancing.hpp"
+#include "utils/conversion.hpp"
+#include "utils/exceptions.hpp"
+#include "utils/printing.hpp"
 
-/* comments:
-	- n (tree traversal) + n (nr of nodes) * lg n (insert) 
-	- comparison functions => NODES!
-	- iterator operation's order: 
-		1. operator !=
-		2. operator *
-		3. operator ++
-		- if not fixable, wrong order will throw an exception
-	- sorting in liner time + linear enqueue VS O(n*lg n) constructing
-	- a node can be
-		- parent  - height h
-		- leaf    - height 1
-		- nullptr - height 0
-	- does not accept repeating values
-*/
-
-template <class T = int>
-class avl : public data_structure<modifier_methods<T, avl<T>>, avl_specific<node_avlt<T>>,
-	avl_constant<avl<T>, node_avlt<T>>, avl_queries<T, node_avlt<T>>, 
-	instance_synergy<avl<T>>, iterator_methods<avl_iterator<T>>>
+namespace ds::detail
 {
-	// typedefs:
-	structure_typedefs;
-	typedef node_avlt<T>* ptr;
-	typedef const node_avlt<T>* ptr_return;
-
-public:
-	// constructors:
-	~avl();
-	avl();
-	avl(const std::initializer_list<T>& data);
-	avl(const T* data, szt data_size);
-	avl(const avl<T>& tree);
-	avl(const avl<T>&& tree);
-
-	// modifier methods:
-	avl<T>& operator = (const avl<T>& tree);
-	avl<T>& clear();
-	avl<T>& set_f(fct f);
-
-	// specific methods:
-	avl<T>& insert(const node_avlt<T>* const value);
-	avl<T>& remove(const node_avlt<T>* const value);
-
-	// constant methods:
-	bool operator == (const avl<T>& tree) const;
-	size_t get_n() const;
-	void*  get_f() const;
-	bool   empty() const;
-	void   print() const;
-	size_t get_arity() const;
-	ptr_return get_r() const;
-	
-	// query operations:
-	size_t height(const node_avlt<T>* const parent) const;
-	ptr_return search(const node_avlt<T>* parent, t value) const;
-	ptr_return minimum() const;
-	ptr_return maximum() const;
-	ptr_return predcessr(const node_avlt<T>* value) const;
-	ptr_return successor(const node_avlt<T>* value) const;
-
-	// instance synergy:
-	avl<T>& integrates(const avl<T>& tree);
-	avl<T>& eliminates(const avl<T>& tree);
-	avl<T>& intersects(const avl<T>& tree);
-
-	// iterator methods:
-	avl_iterator<T> begin() const;
-	avl_iterator<T> end() const;
-
-	// friend functions:
-	template <class T> friend T* convert(const avl<T>& tree);
-	template <class T> friend std::ostream& operator << (std::ostream& out, const avl<T>& tree);
-	template <class T> friend void* collection_ptr(const avl<T>& tree); // just for the collection!
-
-private:
-	// data members:
-	node_avlt<T>* root;
-	size_t n;
-
-	// auxiliar utility:
-	fct compare;
-	ptr left_rotation(node_avlt<T>* const node);
-	ptr rght_rotation(node_avlt<T>* const node);
-
-	ptr insert_call(const node_avlt<T>* const value, node_avlt<T>*& parent);
-	ptr remove_call(const node_avlt<T>* const value, node_avlt<T>*& parent);
-
-public:
-	static const size_t LEFT;
-	static const size_t RGHT;
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-avl<T>::~avl() 
-{ 
-	clear();
+	// Test hook: declared here, defined only by the test suite to inspect the node structure.
+	struct tree_inspector;
 }
 
-template <class T>
-avl<T>::avl()
+namespace ds
 {
-	root = nullptr;
-	n = 0;
-	compare = [](t x, t y)->bool { return x > y; };
-}
-
-template <class T>
-avl<T>::avl(const std::initializer_list<T>& data) : avl<T>()
-{
-	for (auto value : data)
+	// Self-balancing binary search tree of unique values. The balancing tag (avl or red_black) picks the node
+	// augmentation and the rebalance step; search, traversal and queries are shared.
+	template <class balancing, class T, class compare = std::less<T>>
+	class tree
 	{
-		node_avlt<T> new_node(value);
-		insert(&new_node);
-	}
-}
+		using node_type = detail::tree_node<T, typename balancing::augmentation>;
 
-template <class T>
-avl<T>::avl(const T* data, szt data_size) : avl<T>()
-{
-	FOR(data_size)
+		// Where a value belongs: the existing node holding it, or the parent and side to attach it under.
+		struct slot
+		{
+			node_type* existing;
+			node_type* parent;
+			detail::side direction;
+		};
+
+	public:
+		using value_type = T;
+		using size_type = std::size_t;
+		using const_reference = const T&;
+		using comparator = compare;
+		using const_iterator = detail::tree_iterator<node_type, const T>;
+
+		// Constructors and destructor. Duplicate source values are kept once.
+		~tree();
+		tree() noexcept(std::is_nothrow_default_constructible_v<comparator>);
+		tree(std::initializer_list<T> initial);
+		tree(const T* source, size_type count);
+		tree(const tree& other);
+		tree(tree&& other) noexcept(std::is_nothrow_move_constructible_v<comparator>);
+
+		// Modifier methods.
+		tree& operator=(const tree& other);
+		tree& operator=(tree&& other) noexcept(std::is_nothrow_move_assignable_v<comparator>);
+		tree& clear() noexcept;
+		tree& set_compare(comparator replacement);
+
+		// Specific methods. Inserting a value already present and removing a missing one change nothing.
+		tree& insert(T value);
+		tree& remove(const_reference value);
+
+		// Constant methods.
+		bool operator==(const tree& other) const;
+		bool operator!=(const tree& other) const;
+		size_type size() const noexcept;
+		bool empty() const noexcept;
+		void print() const;
+
+		// Query operations.
+		const_iterator search(const_reference value) const;
+		const_iterator minimum() const;
+		const_iterator maximum() const;
+		const_iterator predecessor(const_iterator position) const;
+		const_iterator successor(const_iterator position) const;
+
+		// Iterator methods. Traversal is in order; values are read-only to keep the tree ordered.
+		const_iterator begin() const noexcept;
+		const_iterator end() const noexcept;
+
+		// Friend functions.
+		friend std::ostream& operator<<(std::ostream& out, const tree& values)
+		{
+			return detail::write_elements(out, values);
+		}
+
+		friend std::unique_ptr<T[]> convert(const tree& values)
+		{
+			return detail::copy_elements<T>(values, values.length);
+		}
+
+		friend struct detail::tree_inspector;
+
+	private:
+		node_type* root = nullptr;
+		size_type length = 0;
+		comparator order{};
+
+		slot find_slot(const T& value) const;
+		void attach(node_type* fresh, const slot& place) noexcept;
+		void unlink(node_type* removed) noexcept;
+		void copy_subtree(const node_type* source, node_type* parent, detail::side direction);
+		node_type* detach_all() noexcept;
+		const_iterator neighbor_of(const char* operation, const_iterator position, detail::side direction) const;
+		void steal(tree& other) noexcept;
+		void swap(tree& other) noexcept;
+	};
+
+	//------------------------------------------------
+	// Constructors and destructor.
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::~tree()
 	{
-		ptr new_node = new node_avlt<T>(data[i]);
-		insert(new_node);
-	}
-}
-
-template <class T>
-avl<T>::avl(const avl<T>& tree) : avl<T>()
-{
-	ptr curent = tree.root;
-	queue<ptr> nodes;
-	nodes.push(curent);
-
-	while (!nodes.empty())
-	{
-		curent = nodes.front();
-		nodes.pop();
-
-		if (curent->successor[LEFT])
-			nodes.push(curent->successor[LEFT]);
-		if (curent->successor[RGHT])
-			nodes.push(curent->successor[RGHT]);
-
-		insert(curent);
-	}
-}
-
-template <class T>
-avl<T>::avl(const avl<T>&& tree) : avl<T>()
-{
-	ptr curent = tree.root;
-	queue<ptr> nodes;
-	nodes.push(curent);
-
-	while (!nodes.empty())
-	{
-		curent = nodes.front();
-		nodes.pop();
-
-		if (curent->successor[LEFT])
-			nodes.push(curent->successor[LEFT]);
-		if (curent->successor[RGHT])
-			nodes.push(curent->successor[RGHT]);
-
-		insert(curent);
-	}
-}
-
-//------------------------------------------------
-// modifier methods:
-
-template <class T>
-avl<T>& avl<T>::operator = (const avl<T>& tree)
-{
-	clear();
-	ptr curent = tree.root;
-	queue<ptr> nodes;
-	nodes.push(curent);
-
-	while (!nodes.empty())
-	{
-		curent = nodes.front();
-		nodes.pop();
-
-		if (curent->successor[LEFT])
-			nodes.push(curent->successor[LEFT]);
-		if (curent->successor[RGHT])
-			nodes.push(curent->successor[RGHT]);
-
-		insert(curent);
+		clear();
 	}
 
-	return *this;
-}
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::tree() noexcept(std::is_nothrow_default_constructible_v<comparator>) {}
 
-template <class T>
-avl<T>& avl<T>::clear()
-{
-	if (empty())
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::tree(std::initializer_list<T> initial) : tree(initial.begin(), initial.size()) {}
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::tree(const T* source, size_type count) : tree()
+	{
+		for (size_type index = 0; index < count; ++index)
+			insert(source[index]);
+	}
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::tree(const tree& other) : order(other.order)
+	{
+		try
+		{
+			if (other.root != nullptr)
+				copy_subtree(other.root, nullptr, detail::side::left);
+		}
+		catch (...)
+		{
+			clear();
+			throw;
+		}
+	}
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>::tree(tree&& other) noexcept(std::is_nothrow_move_constructible_v<comparator>)
+		: order(std::move(other.order))
+	{
+		steal(other);
+	}
+
+	//------------------------------------------------
+	// Modifier methods.
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::operator=(const tree& other)
+	{
+		tree copy(other);
+		swap(copy);
 		return *this;
-
-	ptr curent = root;
-	queue<ptr> nodes;
-	nodes.push(curent);
-
-	while (!nodes.empty())
-	{
-		curent = nodes.front();
-		nodes.pop();
-
-		if (curent->successor[LEFT])
-			nodes.push(curent->successor[LEFT]);
-		if (curent->successor[RGHT])
-			nodes.push(curent->successor[RGHT]);
-		
-		delete curent;
-	}
-		
-	n = 0;
-	root = nullptr;
-	return *this;
-}
-
-template <class T>
-avl<T>& avl<T>::set_f(fct f)
-{
-	compare = f;
-	return *this;
-}
-
-//------------------------------------------------
-// specific methods:
-
-template <class T>
-avl<T>& avl<T>::insert(const node_avlt<T>* const value)
-{
-	if (value)
-	{
-		node_avlt<T> copy_value(value->get());
-		root = insert_call(&copy_value, root);
 	}
 
-	return *this;
-}
-
-template <class T>
-avl<T>& avl<T>::remove(const node_avlt<T>* const value)
-{
-	if(value)
-		root = remove_call(value, root);
-	return *this;
-}
-
-//------------------------------------------------
-// constant methods:
-
-template <class T>
-bool avl<T>::operator == (const avl<T>& tree) const
-{
-	if (this->n != tree.n)
-		return false;
-	
-	avl_iterator<T> it1(this->root), it2(tree.root), dummy{};
-
-	FOR(n)
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::operator=(tree&& other) noexcept(std::is_nothrow_move_assignable_v<comparator>)
 	{
-		it1 != dummy;
-		it2 != dummy;
-		T val1 = *it1, val2 = *it2;
-		if (val1 != val2)
+		if (this == &other)
+			return *this;
+
+		clear();
+		steal(other);
+		order = std::move(other.order);
+		return *this;
+	}
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::clear() noexcept
+	{
+		node_type* pending = detach_all();
+		while (pending != nullptr)
+			delete std::exchange(pending, pending->parent);
+		return *this;
+	}
+
+	// Relinks every existing node under the new order; values that become equivalent are dropped.
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::set_compare(comparator replacement)
+	{
+		order = std::move(replacement);
+		node_type* pending = detach_all();
+		while (pending != nullptr)
+		{
+			node_type* relinked = std::exchange(pending, pending->parent);
+			relinked->parent = nullptr;
+			relinked->augment = {};
+
+			const slot place = find_slot(relinked->get());
+			if (place.existing != nullptr)
+				delete relinked;
+			else
+				attach(relinked, place);
+		}
+
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Specific methods.
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::insert(T value)
+	{
+		const slot place = find_slot(value);
+		if (place.existing == nullptr)
+			attach(new node_type(std::move(value)), place);
+		return *this;
+	}
+
+	template <class balancing, class T, class compare>
+	tree<balancing, T, compare>& tree<balancing, T, compare>::remove(const_reference value)
+	{
+		node_type* found = find_slot(value).existing;
+		if (found != nullptr)
+			unlink(found);
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Constant methods.
+
+	template <class balancing, class T, class compare>
+	bool tree<balancing, T, compare>::operator==(const tree& other) const
+	{
+		if (length != other.length)
 			return false;
-		++it1;
-		++it2;
-	}
 
-	return true;
-}
-
-template <class T>
-size_t avl<T>::get_n() const
-{
-	return n;
-}
-
-template <class T>
-void* avl<T>::get_f() const
-{
-	return (void*)compare;
-}
-
-template <class T>
-bool avl<T>::empty() const
-{
-	return (nullptr == root && 0 == n);
-}
-
-template <class T>
-void avl<T>::print() const
-{
-	if (empty())
-		return;
-
-	for (auto value : *this)
-		std::cout << value << ' ';
-	std::cout << '\n';
-}
-
-template <class T>
-size_t avl<T>::get_arity() const
-{
-	return root->get_arity();
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::get_r() const
-{
-	return root;
-}
-
-//------------------------------------------------
-// query operations:
-
-template <class T>
-size_t avl<T>::height(const node_avlt<T>* const parent) const
-{
-	if (nullptr == parent)
-		return 0;
-	return parent->get_height();
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::search(const node_avlt<T>* parent, t value) const
-{
-	if (nullptr == parent || empty())
-		return nullptr;
-
-	ptr it = root;
-	while (it)
-	{
-		if (it->get() == value)
-			return it;
-		if (compare(it->get(), value))
-			it = it->successor[left_child];
-		else
-			it = it->successor[rght_child];
-	}
-
-	return nullptr; // the value does not exist
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::minimum() const
-{
-	if (empty())
-		return nullptr;
-
-	ptr it = root;
-	while(it->successor[left_child])
-		it = it->successor[left_child];
-	return it;
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::maximum() const
-{
-	if (empty())
-		return nullptr;
-
-	ptr it = root;
-	while (it->successor[rght_child])
-		it = it->successor[rght_child];
-	return it;
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::predcessr(const node_avlt<T>* value) const
-{
-	if (nullptr == value)
-		return nullptr;
-
-	ptr it = root;
-	while (it && (compare(it->get(), value->get()) || value->get() == it->get())) // until it points to a value smaller than value->get()
-		it = it->successor[left_child];
-	
-	while (it && it->successor[rght_child])
-		it = it->successor[rght_child];
-
-	return it;
-}
-
-template <class T>
-const node_avlt<T>* avl<T>::successor(const node_avlt<T>* value) const
-{
-	if (nullptr == value)
-		return nullptr;
-	
-	ptr it = root;
-	while (it && (compare(value->get(), it->get()) || value->get() == it->get()))
-		it = it->successor[rght_child];
-
-	while (it && it->successor[left_child])
-		it = it->successor[left_child];
-
-	return it;
-}
-
-//------------------------------------------------
-// instance synergy:
-
-template <class T>
-avl<T>& avl<T>::integrates(const avl<T>& tree)
-{
-	if (this->empty())
-		return *this = tree;
-	if (tree.empty())
-		return *this;
-
-	if (this->compare != tree.compare)
-		hard_error("both objects impose the same comparison function");
-
-	for(auto value : tree)
-	{
-		node_avlt<T> it(value);
-		insert(&it);
-	}
-
-	return *this;
-}
-
-template <class T>
-avl<T>& avl<T>::eliminates(const avl<T>& tree)
-{
-	if (this->empty() || tree.empty())
-		return *this;
-
-	if (this->compare != tree.compare)
-		hard_error("both objects impose the same comparison function");
-
-	for (auto value : tree)
-	{
-		node_avlt<T> it(value);
-		remove(&it);
-	}
-
-	return *this;
-}
-
-template <class T>
-avl<T>& avl<T>::intersects(const avl<T>& tree) // to rethink very inneficient
-{
-	if (this->empty())
-		return *this;
-	if (tree.empty())
-	{
-		this->clear();
-		return *this;
-	}
-
-	if (this->compare != tree.compare)
-		hard_error("both objects impose the same comparison function");
-
-	avl<T> auxiliar;
-	for (auto value : tree)
-	{
-		auto it = this->search(this->get_r(), value);
-		if (it)
-			auxiliar.insert(it);
-	}
-
-	return *this = auxiliar;
-}
-
-//------------------------------------------------
-// iterator methods:
-
-template <class T>
-avl_iterator<T> avl<T>::begin() const
-{
-	return root;
-}
-
-template <class T>
-avl_iterator<T> avl<T>::end() const
-{
-	return avl_iterator<T>();
-}
-
-//------------------------------------------------
-// friend functions:
-
-template <class T> 
-T* convert(const avl<T>& tree)
-{
-	T* arr = new T[tree.n]{};
-	size_t index = 0;
-
-	for (auto value : tree)
-	{
-		arr[index] = value;
-		index++;
-	}
-
-	return arr;
-}
-
-template <class T> 
-std::ostream& operator << (std::ostream& out, const avl<T>& tree)
-{
-	if (tree.empty())
-		return out;
-
-	for (auto value : tree)
-		out << value << ' ';
-	out << '\n';
-	return out;
-}
-
-template <class T> 
-void* collection_ptr(const avl<T>& tree)
-{
-	return (void*)tree.get_r();
-}
-
-//------------------------------------------------
-// auxiliar utility:
-
-template <class T>
-const size_t avl<T>::LEFT = 0;
-
-template <class T>
-const size_t avl<T>::RGHT = 1;
-
-template <class T>
-node_avlt<T>* avl<T>::left_rotation(node_avlt<T>* const node)
-{
-	ptr it = node->successor[rght_child];
-	node->successor[rght_child] = it->successor[left_child];
-	it->successor[left_child] = node;
-
-	size_t h1 = height(node->successor[left_child]);
-	size_t h2 = height(node->successor[rght_child]);
-	node->set_height(1 + (h1 > h2 ? h1 : h2));
-
-	h1 = height(it->successor[left_child]);
-	h2 = height(it->successor[rght_child]);
-	it->set_height(1 + (h1 > h2 ? h1 : h2));
-	return it;
-}
-
-template <class T>
-node_avlt<T>* avl<T>::rght_rotation(node_avlt<T>* const node)
-{
-	ptr it = node->successor[left_child];
-	node->successor[left_child] = it->successor[rght_child];
-	it->successor[rght_child] = node;
-	
-	size_t h1 = height(node->successor[left_child]);
-	size_t h2 = height(node->successor[rght_child]);
-	node->set_height(1 + (h1 > h2 ? h1 : h2));
-
-	h1 = height(it->successor[left_child]);
-	h2 = height(it->successor[rght_child]);
-	it->set_height(1 + (h1 > h2 ? h1 : h2));
-	return it;
-}
-
-//------------------------------------------------
-// auxiliar utility x 2:
-
-template <class T>
-node_avlt<T>* avl<T>::insert_call(const node_avlt<T>* const value, node_avlt<T>*& parent)
-{
-	// base case
-	if (nullptr == parent)
-	{
-		n++;
-		return new node_avlt<T>(value->get());
-	}
-
-	if (value->get() == parent->get())
-		return parent;
-	
-	// recursive calls
-	if (compare(parent->get(), value->get()))
-		parent->successor[LEFT] = insert_call(value, parent->successor[LEFT]);
-	else
-		parent->successor[RGHT] = insert_call(value, parent->successor[RGHT]);
-
-	// height
-	size_t h1 = height(parent->successor[LEFT]);
-	size_t h2 = height(parent->successor[RGHT]);
-	parent->set_height(1 + (h1 > h2 ? h1 : h2));
-
-	// rebalancing
-	int balance_factor = parent->balance_factor();
-
-	if (balance_factor > 1 && compare(parent->successor[LEFT]->get(), value->get()))
-		return rght_rotation(parent);
-	if (balance_factor < -1 && compare(value->get(), parent->successor[RGHT]->get()))
-		return left_rotation(parent);
-
-	if (balance_factor > 1 && compare(value->get(), parent->successor[LEFT]->get()))
-	{
-		parent->successor[LEFT] = left_rotation(parent->successor[LEFT]);
-		return rght_rotation(parent);
-	}
-
-	if (balance_factor < -1 && compare(parent->successor[RGHT]->get(), value->get()))
-	{
-		parent->successor[RGHT] = rght_rotation(parent->successor[RGHT]);
-		return left_rotation(parent);
-	}
-
-	return parent;
-}
-
-template <class T>
-node_avlt<T>* avl<T>::remove_call(const node_avlt<T>* const value, node_avlt<T>*& parent)
-{
-	// base case
-	if (nullptr == parent)
-		return parent;
-
-	// searching for the value
-	if (compare(parent->get(), value->get()))
-		parent->successor[LEFT] = remove_call(value, parent->successor[LEFT]);
-	else if (compare(value->get(), parent->get()))
-		parent->successor[RGHT] = remove_call(value, parent->successor[RGHT]);
-	
-	else // found the value
-	{
-		if (parent->successor[LEFT])
+		const_iterator theirs = other.begin();
+		for (const T& mine : *this)
 		{
-			if (parent->successor[RGHT]) // both
-			{
-				auto to_remove = successor(parent);
-				parent->set(to_remove->get());
-				parent->successor[RGHT] = 
-					remove_call(to_remove, parent->successor[RGHT]);
-			}
-			else // only left
-			{
-				n--;
-				auto it = parent;
-				parent = parent->successor[LEFT];
-				delete it;
-			}
+			if (!(mine == *theirs))
+				return false;
+			++theirs;
 		}
 
+		return true;
+	}
+
+	template <class balancing, class T, class compare>
+	bool tree<balancing, T, compare>::operator!=(const tree& other) const
+	{
+		return !(*this == other);
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::size_type tree<balancing, T, compare>::size() const noexcept
+	{
+		return length;
+	}
+
+	template <class balancing, class T, class compare>
+	bool tree<balancing, T, compare>::empty() const noexcept
+	{
+		return length == 0;
+	}
+
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::print() const
+	{
+		std::cout << *this << '\n';
+	}
+
+	//------------------------------------------------
+	// Query operations.
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::search(const_reference value) const
+	{
+		return const_iterator(find_slot(value).existing);
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::minimum() const
+	{
+		if (empty())
+			throw empty_error("tree::minimum");
+		return const_iterator(detail::extreme(root, detail::side::left));
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::maximum() const
+	{
+		if (empty())
+			throw empty_error("tree::maximum");
+		return const_iterator(detail::extreme(root, detail::side::right));
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::predecessor(const_iterator position) const
+	{
+		return neighbor_of("tree::predecessor", position, detail::side::left);
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::successor(const_iterator position) const
+	{
+		return neighbor_of("tree::successor", position, detail::side::right);
+	}
+
+	//------------------------------------------------
+	// Iterator methods.
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::begin() const noexcept
+	{
+		return const_iterator(root == nullptr ? nullptr : detail::extreme(root, detail::side::left));
+	}
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::end() const noexcept
+	{
+		return const_iterator(nullptr);
+	}
+
+	//------------------------------------------------
+	// Private helpers.
+
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::slot tree<balancing, T, compare>::find_slot(const T& value) const
+	{
+		slot place{ nullptr, nullptr, detail::side::left };
+		for (node_type* current = root; current != nullptr; current = current->child(place.direction))
+		{
+			if (order(value, current->get()))
+				place.direction = detail::side::left;
+			else if (order(current->get(), value))
+				place.direction = detail::side::right;
+			else
+			{
+				place.existing = current;
+				return place;
+			}
+
+			place.parent = current;
+		}
+
+		return place;
+	}
+
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::attach(node_type* fresh, const slot& place) noexcept
+	{
+		fresh->parent = place.parent;
+		if (place.parent == nullptr)
+			root = fresh;
+		else
+			place.parent->child(place.direction) = fresh;
+
+		++length;
+		balancing::after_insert(root, fresh);
+	}
+
+	// Unlinks the node, replacing it by its successor when it has two children, then lets the policy rebalance.
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::unlink(node_type* removed) noexcept
+	{
+		using detail::side;
+		detail::removal<node_type, typename balancing::augmentation> unlinked{ nullptr, removed->parent, removed->augment };
+
+		if (removed->child(side::left) == nullptr || removed->child(side::right) == nullptr)
+		{
+			const side only = removed->child(side::left) == nullptr ? side::right : side::left;
+			unlinked.child = removed->child(only);
+			detail::transplant(root, removed, unlinked.child);
+		}
 		else
 		{
-			if (parent->successor[RGHT]) // only right
+			node_type* successor = detail::extreme(removed->child(side::right), side::left);
+			unlinked.removed = successor->augment;
+			unlinked.child = successor->child(side::right);
+			unlinked.parent = successor;
+			if (successor->parent != removed)
 			{
-				n--;
-				auto it = parent;
-				parent = parent->successor[RGHT];
-				delete it;
+				unlinked.parent = successor->parent;
+				detail::transplant(root, successor, unlinked.child);
+				successor->child(side::right) = removed->child(side::right);
+				successor->child(side::right)->parent = successor;
 			}
-			else // no children
-			{
-				n--;
-				delete parent;
-				parent = nullptr;
-			}
+
+			detail::transplant(root, removed, successor);
+			successor->child(side::left) = removed->child(side::left);
+			successor->child(side::left)->parent = successor;
+			successor->augment = removed->augment;
 		}
+
+		delete removed;
+		--length;
+		balancing::after_remove(root, unlinked);
 	}
 
-	if (nullptr == parent)
-		return nullptr;
-
-	// height
-	size_t h1 = height(parent->successor[LEFT]);
-	size_t h2 = height(parent->successor[RGHT]);
-	parent->set_height(1 + (h1 > h2 ? h1 : h2));
-
-	// rebalancing
-	int balance_factor = parent->balance_factor();
-	ptr left = parent->successor[LEFT];
-	ptr rght = parent->successor[RGHT];
-
-	if (balance_factor > 1 && left->balance_factor() >= 0)
-		return rght_rotation(parent);
-	if (balance_factor < -1 && rght->balance_factor() <= 0)
-		return left_rotation(parent);
-
-	if (balance_factor > 1 && left->balance_factor() < 0)
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::copy_subtree(const node_type* source, node_type* parent, detail::side direction)
 	{
-		parent->successor[left_child] = left_rotation(parent->successor[left_child]);
-		return rght_rotation(parent);
+		node_type* copy = new node_type(source->get());
+		copy->augment = source->augment;
+		copy->parent = parent;
+		if (parent == nullptr)
+			root = copy;
+		else
+			parent->child(direction) = copy;
+		++length;
+
+		for (const detail::side child_side : { detail::side::left, detail::side::right })
+			if (source->child(child_side) != nullptr)
+				copy_subtree(source->child(child_side), copy, child_side);
 	}
 
-	if (balance_factor < -1 && rght->balance_factor() > 0)
+	// Takes every node out of the tree in post-order, without recursion, and returns them as a chain
+	// linked through the parent pointers. The tree is left empty.
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::node_type* tree<balancing, T, compare>::detach_all() noexcept
 	{
-		parent->successor[rght_child] = rght_rotation(parent->successor[rght_child]);
-		return left_rotation(parent);
+		using detail::side;
+		node_type* chain = nullptr;
+		node_type* current = root;
+		while (current != nullptr)
+		{
+			node_type* below = current->child(side::left) != nullptr ? current->child(side::left) : current->child(side::right);
+			if (below != nullptr)
+			{
+				current = below;
+				continue;
+			}
+
+			node_type* parent = current->parent;
+			if (parent != nullptr)
+				parent->child(detail::side_in_parent(current)) = nullptr;
+
+			current->parent = chain;
+			chain = current;
+			current = parent;
+		}
+
+		root = nullptr;
+		length = 0;
+		return chain;
 	}
 
-	return parent;
+	template <class balancing, class T, class compare>
+	typename tree<balancing, T, compare>::const_iterator tree<balancing, T, compare>::neighbor_of(
+		const char* operation, const_iterator position, detail::side direction) const
+	{
+		if (position.current == nullptr)
+			throw position_error(operation, "position is the end");
+		return const_iterator(detail::neighbor(position.current, direction));
+	}
+
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::steal(tree& other) noexcept
+	{
+		root = std::exchange(other.root, nullptr);
+		length = std::exchange(other.length, 0);
+	}
+
+	template <class balancing, class T, class compare>
+	void tree<balancing, T, compare>::swap(tree& other) noexcept
+	{
+		using std::swap;
+		swap(root, other.root);
+		swap(length, other.length);
+		swap(order, other.order);
+	}
 }
