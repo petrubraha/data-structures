@@ -169,6 +169,15 @@ TEST_F(deque_fixture, equality_compares_the_elements_in_order)
 	EXPECT_TRUE(numbers != ds::deque<int>{ 1 });
 }
 
+TEST(deque, print_writes_the_elements_and_a_newline)
+{
+	const ds::deque<int> values{ 1, -2, 3 };
+	testing::internal::CaptureStdout();
+	values.print();
+
+	EXPECT_EQ("1 -2 3\n", testing::internal::GetCapturedStdout());
+}
+
 TEST_F(deque_fixture, front_and_back_read_both_ends)
 {
 	EXPECT_EQ(-1, numbers.front());
