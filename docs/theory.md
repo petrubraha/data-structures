@@ -32,12 +32,12 @@ Partition schemes:
 
 The library moves the chosen pivot to the front before partitioning, so Hoare's split never lands on the last index whatever the strategy. It recurses into the smaller part and loops over the larger one, which bounds the stack depth to O(log n).
 
-  | Measure     | Quick sort    | Merge sort | Heap sort  |
-  | ----------- | ------------- | ---------- | ---------- |
-  | Worst time  | O(n^2)        | O(n log n) | O(n log n) |
-  | Expected    | O(n log n)    | O(n log n) | O(n log n) |
-  | Extra space | O(log n)      | O(n)       | O(1)       |
-  | Stable      | No            | Yes        | No         |
+| Measure     | Quick sort | Merge sort | Heap sort  |
+| ----------- | ---------- | ---------- | ---------- |
+| Worst time  | O(n^2)     | O(n log n) | O(n log n) |
+| Expected    | O(n log n) | O(n log n) | O(n log n) |
+| Extra space | O(log n)   | O(n)       | O(1)       |
+| Stable      | No         | Yes        | No         |
 
 Quick sort is usually the fastest of the three in practice because its inner loop is short and works in place. Merge sort is the choice when equal elements must keep their order; heap sort when no extra memory is allowed.
 

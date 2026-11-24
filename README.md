@@ -6,18 +6,18 @@ A header-only C++17 template library of fundamental data structures, built with 
 
 All public types live in the `ds` namespace. Include the header named after the structure.
 
-  | Structure            | Header            | Backing              |
-  | -------------------- | ----------------- | -------------------- |
-  | `array`              | `array.hpp`       | Growable buffer      |
-  | `linked_list`        | `linked_list.hpp` | Singly linked, tail  |
-  | `stack`              | `stack.hpp`       | Linked list          |
-  | `queue`              | `queue.hpp`       | Linked list          |
-  | `deque`              | `deque.hpp`       | Doubly linked        |
-  | `heap<max, T>`       | `heap.hpp`        | Array, max on top    |
-  | `heap<min, T>`       | `heap.hpp`        | Array, min on top    |
-  | `tree<avl, T>`       | `tree.hpp`        | Height-balanced BST  |
-  | `tree<red_black, T>` | `tree.hpp`        | Colour-balanced BST  |
-  | `hash_map<K, V>`     | `hash_map.hpp`    | Separate chaining    |
+| Structure            | Header            | Backing             |
+| -------------------- | ----------------- | ------------------- |
+| `array`              | `array.hpp`       | Growable buffer     |
+| `linked_list`        | `linked_list.hpp` | Singly linked, tail |
+| `stack`              | `stack.hpp`       | Linked list         |
+| `queue`              | `queue.hpp`       | Linked list         |
+| `deque`              | `deque.hpp`       | Doubly linked       |
+| `heap<max, T>`       | `heap.hpp`        | Array, max on top   |
+| `heap<min, T>`       | `heap.hpp`        | Array, min on top   |
+| `tree<avl, T>`       | `tree.hpp`        | Height-balanced BST |
+| `tree<red_black, T>` | `tree.hpp`        | Colour-balanced BST |
+| `hash_map<K, V>`     | `hash_map.hpp`    | Separate chaining   |
 
 Every structure follows the same method vocabulary, in this order: constructors, modifiers (`operator=`, `clear`, `set_compare`), structure-specific operations (`insert`, `push`, `sort`, etc.), constant methods (`size`, `empty`, `print`, element access), queries (`search`, `minimum`, `maximum`, `predecessor`, `successor`), iteration (`begin`, `end`), and the `operator<<` and `convert` friends. A structure leaves out a family that does not apply to it.
 
@@ -66,13 +66,13 @@ The sorting algorithms are `bubble_sort`, `selection_sort`, `insertion_sort`, `m
 
 Recoverable misuse throws a type derived from `<stdexcept>`, with a message that names the operation and the values involved, e.g. `array::get: index 7 out of range, size is 5`.
 
-  | Exception        | Base                | Thrown on            |
-  | ---------------- | ------------------- | -------------------- |
-  | `index_error`    | `std::out_of_range` | Bad index            |
-  | `empty_error`    | `std::out_of_range` | Access when empty    |
-  | `key_error`      | `std::out_of_range` | Missing map key      |
-  | `position_error` | `std::out_of_range` | Unusable iterator    |
-  | `capacity_error` | `std::length_error` | Impossible capacity  |
+| Exception        | Base                | Thrown on           |
+| ---------------- | ------------------- | ------------------- |
+| `index_error`    | `std::out_of_range` | Bad index           |
+| `empty_error`    | `std::out_of_range` | Access when empty   |
+| `key_error`      | `std::out_of_range` | Missing map key     |
+| `position_error` | `std::out_of_range` | Unusable iterator   |
+| `capacity_error` | `std::length_error` | Impossible capacity |
 
 Dereferencing or advancing an end iterator is not recoverable: the process prints the reason to standard error and aborts.
 
