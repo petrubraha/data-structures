@@ -1,121 +1,117 @@
 #pragma once
-#include "linked_list.h"
-#include "dev/structure interface/adaptor.h"
+#include <cstddef>
 #include <initializer_list>
+#include <utility>
+#include "linked_list.hpp"
+#include "utils/exceptions.hpp"
 
-template <class T = int>
-class queue : public adaptor<T>
-{	
-public:
-	// constructors:
-	~queue() = default;
-	queue();
-	queue(const std::initializer_list<T>& data);
-	queue(const T* data, const size_t& data_size);
-	queue(const queue<T>& q);
-	queue(const queue<T>&& q);
-
-	// modifier methods:
-	queue<T>& operator = (const queue<T>& q);
-	
-	// specific methods:
-	queue<T>& push(const T& value);
-	queue<T>& pop();
-
-	// constant methods:
-	T	 front() const;
-	T	 back() const;
-	bool operator == (const queue<T>& q) const;
-	size_t get_n() const;
-	bool   empty() const;
-
-private:
-	// data members:
-	linked_list<T> values;
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-queue<T>::queue() : values() {}
-
-template <class T>
-queue<T>::queue(const std::initializer_list<T>& data) : values(data) {}
-
-template <class T>
-queue<T>::queue(const T* data, const size_t& data_size) : values(data, data_size) {}
-
-template <class T>
-queue<T>::queue(const queue<T>& q) : values(q.values) {}
-
-template <class T>
-queue<T>::queue(const queue<T>&& q) : values(q.values) {}
-
-//------------------------------------------------
-// modifier methods:
-
-template <class T>
-queue<T>& queue<T>::operator = (const queue<T>& q)
+namespace ds
 {
-	this->values = q.values;
-}
+	// First in, first out. Holds a linked list: push links at the tail, pop unlinks the head, both O(1).
+	template <class T>
+	class queue
+	{
+	public:
+		using value_type = T;
+		using size_type = std::size_t;
+		using const_reference = const T&;
 
-//------------------------------------------------
-// specific methods:
+		// Constructors and destructor. The source elements are pushed in order, so the first one is in front.
+		~queue() = default;
+		queue() = default;
+		queue(std::initializer_list<T> initial);
+		queue(const T* source, size_type count);
+		queue(const queue& other) = default;
+		queue(queue&& other) noexcept = default;
 
-template <class T>
-queue<T>& queue<T>::push(const T& value)
-{
-	node_list<T> ptr(value);
-	auto c_tail = values.get_tail();
-	auto tail = const_cast<node_list<T>*>(c_tail);
-	values.insert(&ptr, tail);
-	return *this;
-}
+		// Modifier methods.
+		queue& operator=(const queue& other) = default;
+		queue& operator=(queue&& other) noexcept = default;
 
-template <class T>
-queue<T>& queue<T>::pop()
-{
-	if(empty())
-		hard_error("no data");
-	values.remove(linked_list<T>::head_node);
-	return *this;
-}
+		// Specific methods.
+		queue& push(T value);
+		queue& pop();
 
-//------------------------------------------------
-// constant methods:
+		// Constant methods.
+		bool operator==(const queue& other) const;
+		bool operator!=(const queue& other) const;
+		size_type size() const noexcept;
+		bool empty() const noexcept;
+		const_reference front() const;
+		const_reference back() const;
 
-template <class T>
-T queue<T>::front() const
-{
-	if (empty())
-		hard_error("no data");
-	return values.get_head()->get();
-}
+	private:
+		linked_list<T> values;
+	};
 
-template <class T>
-T queue<T>::back() const
-{
-	if (empty())
-		hard_error("no data");
-	return values.get_tail()->get();
-}
+	//------------------------------------------------
+	// Constructors and destructor.
 
-template <class T>
-bool queue<T>::operator == (const queue<T>& q) const
-{
-	return this->values == q.values;
-}
+	template <class T>
+	queue<T>::queue(std::initializer_list<T> initial) : values(initial) {}
 
-template <class T>
-size_t queue<T>::get_n() const
-{
-	return values.get_n();
-}
+	template <class T>
+	queue<T>::queue(const T* source, size_type count) : values(source, count) {}
 
-template <class T>
-bool queue<T>::empty() const
-{
-	return values.empty();
+	//------------------------------------------------
+	// Specific methods.
+
+	template <class T>
+	queue<T>& queue<T>::push(T value)
+	{
+		values.insert(std::move(value));
+		return *this;
+	}
+
+	template <class T>
+	queue<T>& queue<T>::pop()
+	{
+		if (empty())
+			throw empty_error("queue::pop");
+		values.remove(0);
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Constant methods.
+
+	template <class T>
+	bool queue<T>::operator==(const queue& other) const
+	{
+		return values == other.values;
+	}
+
+	template <class T>
+	bool queue<T>::operator!=(const queue& other) const
+	{
+		return values != other.values;
+	}
+
+	template <class T>
+	typename queue<T>::size_type queue<T>::size() const noexcept
+	{
+		return values.size();
+	}
+
+	template <class T>
+	bool queue<T>::empty() const noexcept
+	{
+		return values.empty();
+	}
+
+	template <class T>
+	typename queue<T>::const_reference queue<T>::front() const
+	{
+		if (empty())
+			throw empty_error("queue::front");
+		return values.front();
+	}
+
+	template <class T>
+	typename queue<T>::const_reference queue<T>::back() const
+	{
+		if (empty())
+			throw empty_error("queue::back");
+		return values.back();
+	}
 }

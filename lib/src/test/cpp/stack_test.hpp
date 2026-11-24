@@ -1,59 +1,95 @@
-#pragma once
-#include "stack.h"
-#include "queue.h"
+#include <gtest/gtest.h>
+#include <utility>
+#include "stack.hpp"
+#include "support/compound_type.hpp"
+#include "support/test_values.hpp"
 
-TEST(adaptor, stack)
+namespace
 {
-	stack<> euro_temperatures;
-	EXPECT_TRUE(euro_temperatures.empty());
-	
-	euro_temperatures.push(1);
-	euro_temperatures.push(2);
-	euro_temperatures.push(3);
-	EXPECT_EQ(3, euro_temperatures.top());
-	EXPECT_EQ(3, euro_temperatures.get_n());
+	using ds::test::compound_type;
 
-	euro_temperatures.pop();
-	euro_temperatures.pop();
-	euro_temperatures.push(4);
-	EXPECT_EQ(4, euro_temperatures.top());
-	
-	euro_temperatures.pop();
-	EXPECT_EQ(1, euro_temperatures.top());
-	EXPECT_EQ(1, euro_temperatures.get_n());
-	
-	euro_temperatures.pop();
-	EXPECT_TRUE(euro_temperatures.empty());
-
-	EXPECT_THROW(euro_temperatures.pop(), int);
+	class stack_fixture : public testing::Test
+	{
+	protected:
+		ds::stack<int> numbers{ ds::test::numbers, ds::test::number_count };
+		ds::stack<compound_type> compounds{ ds::test::compounds, ds::test::compound_count };
+	};
 }
 
-TEST(adaptor, queue)
+TEST(stack, default_constructor_creates_an_empty_stack)
 {
-	queue<> rabbit_log{ 100, 60, 42, 25, 23, 21, 20 };
-	EXPECT_EQ(100, rabbit_log.front());
-	EXPECT_EQ(20, rabbit_log.back());
+	const ds::stack<int> values;
 
-	rabbit_log.pop();
-	rabbit_log.pop();
-	rabbit_log.pop();
-	EXPECT_EQ(25, rabbit_log.front());
-	EXPECT_EQ(4, rabbit_log.get_n());
+	EXPECT_TRUE(values.empty());
+	EXPECT_EQ(0u, values.size());
+}
 
-	rabbit_log.push(15);
-	rabbit_log.push(10);
-	rabbit_log.pop();
-	EXPECT_EQ(23, rabbit_log.front());
-	EXPECT_EQ(10, rabbit_log.back());
+TEST(stack, initializer_list_constructor_puts_the_last_element_on_top)
+{
+	const ds::stack<int> values{ 1, 2, 3 };
 
-	FOR(4)
-		rabbit_log.pop();
-	EXPECT_EQ(rabbit_log.front(), rabbit_log.back());
-	EXPECT_FALSE(rabbit_log.empty());
+	EXPECT_EQ(3, values.top());
+	EXPECT_EQ(3u, values.size());
+}
 
-	rabbit_log.pop();
-	EXPECT_TRUE(rabbit_log.empty());
-	EXPECT_THROW(rabbit_log.pop(), int);
-	EXPECT_THROW(rabbit_log.front(), int);
-	EXPECT_THROW(rabbit_log.back(), int);
+TEST_F(stack_fixture, raw_buffer_constructor_puts_the_last_element_on_top)
+{
+	EXPECT_EQ(ds::test::numbers[ds::test::number_count - 1], numbers.top());
+	EXPECT_EQ(ds::test::compounds[ds::test::compound_count - 1], compounds.top());
+}
+
+TEST_F(stack_fixture, copy_makes_an_independent_stack)
+{
+	ds::stack<compound_type> copy(compounds);
+	copy.pop();
+
+	EXPECT_EQ(ds::test::compound_count, compounds.size());
+	EXPECT_EQ(ds::test::compound_count - 1, copy.size());
+}
+
+TEST_F(stack_fixture, move_steals_the_elements)
+{
+	ds::stack<compound_type> target;
+	target = std::move(compounds);
+	const ds::stack<compound_type> moved(std::move(target));
+
+	EXPECT_EQ(ds::test::compound_count, moved.size());
+	EXPECT_TRUE(target.empty());
+}
+
+TEST_F(stack_fixture, copy_assignment_replaces_the_contents)
+{
+	ds::stack<int> target{ 1 };
+	target = numbers;
+
+	EXPECT_TRUE(target == numbers);
+}
+
+TEST(stack, push_and_pop_work_last_in_first_out)
+{
+	ds::stack<int> values;
+	values.push(1).push(2).push(3).pop().pop().push(4);
+
+	EXPECT_EQ(4, values.top());
+	values.pop();
+	EXPECT_EQ(1, values.top());
+	EXPECT_EQ(1u, values.size());
+}
+
+TEST(stack, pop_and_top_of_an_empty_stack_throw)
+{
+	ds::stack<int> values;
+
+	EXPECT_THROW(values.pop(), ds::empty_error);
+	EXPECT_THROW(values.top(), ds::empty_error);
+}
+
+TEST_F(stack_fixture, equality_compares_the_elements_in_order)
+{
+	ds::stack<int> same(numbers);
+	ds::stack<int> different(numbers);
+	different.pop().push(0);
+
+	EXPECT_TRUE(numbers == same);
+	EXPECT_TRUE(numbers != different);
 }
