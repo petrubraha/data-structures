@@ -1,6 +1,6 @@
 #pragma once
 #include <cstddef>
-#include "utils/exceptions.hpp"
+#include "detail/utils/exceptions.hpp"
 
 namespace ds::detail
 {

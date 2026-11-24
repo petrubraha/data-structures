@@ -7,12 +7,12 @@
 #include <type_traits>
 #include <utility>
 #include "array.hpp"
-#include "policy/order.hpp"
-#include "sorting/heap_sort.hpp"
-#include "utils/constants.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/printing.hpp"
+#include "detail/policy/order.hpp"
+#include "detail/sorting/heap_sort.hpp"
+#include "detail/utils/constants.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds
 {

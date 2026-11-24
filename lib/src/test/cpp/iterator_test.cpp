@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
-#include "iterator/array_iterator.hpp"
-#include "iterator/hash_iterator.hpp"
-#include "iterator/list_iterator.hpp"
-#include "iterator/tree_iterator.hpp"
-#include "node/deque_node.hpp"
-#include "node/list_node.hpp"
-#include "node/tree_node.hpp"
+#include "detail/iterator/array_iterator.hpp"
+#include "detail/iterator/hash_iterator.hpp"
+#include "detail/iterator/list_iterator.hpp"
+#include "detail/iterator/tree_iterator.hpp"
+#include "detail/node/deque_node.hpp"
+#include "detail/node/list_node.hpp"
+#include "detail/node/tree_node.hpp"
 
 namespace
 {

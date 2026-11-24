@@ -4,12 +4,12 @@
 #include <random>
 #include <vector>
 #include "array.hpp"
-#include "sorting/bubble_sort.hpp"
-#include "sorting/heap_sort.hpp"
-#include "sorting/insertion_sort.hpp"
-#include "sorting/merge_sort.hpp"
-#include "sorting/quick_sort.hpp"
-#include "sorting/selection_sort.hpp"
+#include "detail/sorting/bubble_sort.hpp"
+#include "detail/sorting/heap_sort.hpp"
+#include "detail/sorting/insertion_sort.hpp"
+#include "detail/sorting/merge_sort.hpp"
+#include "detail/sorting/quick_sort.hpp"
+#include "detail/sorting/selection_sort.hpp"
 #include "support/compound_type.hpp"
 #include "support/test_values.hpp"
 

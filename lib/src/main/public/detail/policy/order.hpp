@@ -1,5 +1,5 @@
 #pragma once
-#include "utils/linear_queries.hpp"
+#include "detail/utils/linear_queries.hpp"
 
 // Heap order tags. Each turns the heap's comparator into the ordering the sift operations use: an element
 // rises above its parent when the parent is ordered before it.

@@ -3,7 +3,7 @@
 #include <initializer_list>
 #include <utility>
 #include "linked_list.hpp"
-#include "utils/exceptions.hpp"
+#include "detail/utils/exceptions.hpp"
 
 namespace ds
 {

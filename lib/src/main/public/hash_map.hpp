@@ -7,12 +7,12 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
-#include "iterator/hash_iterator.hpp"
-#include "node/list_node.hpp"
-#include "utils/constants.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/printing.hpp"
+#include "detail/iterator/hash_iterator.hpp"
+#include "detail/node/list_node.hpp"
+#include "detail/utils/constants.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds
 {
