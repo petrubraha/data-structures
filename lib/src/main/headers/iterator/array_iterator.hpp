@@ -1,4 +1,5 @@
 #pragma once
+#include <type_traits>
 #include "utils/exceptions.hpp"
 
 namespace ds::detail
@@ -10,11 +11,18 @@ namespace ds::detail
 	public:
 		array_iterator(T* current, T* boundary) noexcept;
 
+		// Lets a mutable iterator convert to its read-only counterpart.
+		template <class mutable_type, class = std::enable_if_t<std::is_same_v<const mutable_type, T>>>
+		array_iterator(const array_iterator<mutable_type>& other) noexcept : current(other.current), boundary(other.boundary) {}
+
 		T& operator*() const noexcept;
 		array_iterator& operator++() noexcept;
 		bool operator!=(const array_iterator& other) const noexcept;
 
 	private:
+		template <class>
+		friend class array_iterator;
+
 		T* current;
 		T* boundary;
 	};

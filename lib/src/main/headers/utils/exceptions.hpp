@@ -32,6 +32,14 @@ namespace ds
 			: std::out_of_range(operation + ": key not found") {}
 	};
 
+	// Thrown when an iterator position cannot serve the operation, such as inserting after the end.
+	class position_error : public std::out_of_range
+	{
+	public:
+		position_error(const std::string& operation, const std::string& reason)
+			: std::out_of_range(operation + ": " + reason) {}
+	};
+
 	// Thrown when a requested capacity exceeds what the structure can allocate.
 	class capacity_error : public std::length_error
 	{

@@ -386,7 +386,16 @@ namespace ds
 			throw capacity_error("array::array", count, maximum_capacity());
 
 		reallocate(count);
-		std::uninitialized_copy_n(source, count, values);
+		try
+		{
+			std::uninitialized_copy_n(source, count, values);
+		}
+		catch (...)
+		{
+			release();
+			throw;
+		}
+
 		length = count;
 	}
 
