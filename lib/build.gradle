@@ -77,11 +77,14 @@ tasks.withType(CppCompile).configureEach {
 }
 
 // The test executable runs under AddressSanitizer (and UndefinedBehaviorSanitizer where the toolchain has it).
+// MSVC refuses to link sanitized objects against the uninstrumented library object unless the STL container
+// annotations are disabled on the sanitized side.
+def visualCppSanitizerArgs = ['/fsanitize=address', '/D_DISABLE_STRING_ANNOTATION', '/D_DISABLE_VECTOR_ANNOTATION']
 unitTest {
     binaries.configureEach(CppTestExecutable) { binary ->
         def visualCpp = isVisualCpp(binary.toolChain)
         binary.compileTask.get().compilerArgs.addAll(
-            visualCpp ? ['/fsanitize=address'] : ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
+            visualCpp ? visualCppSanitizerArgs : ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'])
         binary.linkTask.get().linkerArgs.addAll(
             visualCpp ? ['/INCREMENTAL:NO'] : ['-fsanitize=address,undefined'])
     }
