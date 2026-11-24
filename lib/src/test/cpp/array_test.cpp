@@ -5,6 +5,7 @@
 #include "array.hpp"
 #include "support/compound_type.hpp"
 #include "support/test_values.hpp"
+#include "support/throwing_copy.hpp"
 
 namespace
 {
@@ -84,6 +85,14 @@ TEST_F(array_fixture, move_constructor_steals_the_storage)
 	EXPECT_EQ(ds::test::compound_count, moved.size());
 	EXPECT_TRUE(compounds.empty());
 	EXPECT_EQ(0u, compounds.capacity());
+}
+
+TEST(array, copy_constructor_releases_the_storage_when_an_element_copy_throws)
+{
+	const ds::array<ds::test::throwing_copy> source{ ds::test::throwing_copy(1), ds::test::throwing_copy(2) };
+	const ds::test::copy_budget budget(1);
+
+	EXPECT_THROW(ds::array<ds::test::throwing_copy>{ source }, std::runtime_error);
 }
 
 //------------------------------------------------
