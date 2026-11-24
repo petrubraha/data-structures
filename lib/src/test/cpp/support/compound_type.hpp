@@ -1,302 +1,104 @@
 #pragma once
-#include "utils/exceptions.hpp"
-#include "utils/constants.hpp"
-#include <cstring>
+#include <cstddef>
+#include <functional>
+#include <ostream>
+#include <string>
+#include <utility>
 
-class convoluted
+namespace ds::test
 {
-	// data members:
-	int number;
-	bool* address1;
-	char* address2;
-public:
-	// constructors:
-	~convoluted();
-	convoluted(int number, const bool& one, const char* two);
-	convoluted(int null = NULL);
-	convoluted(const convoluted& c);
-	convoluted(const convoluted&& c);
-	
-	// modifier methods:
-	convoluted& operator = (const convoluted& c);
-
-	// specific methods: 
-	void set_number(const int& value);
-	bool operator <  (const convoluted& c); // they only compare the first letter
-	bool operator <= (const convoluted& c);
-	bool operator >  (const convoluted& c);
-	bool operator >= (const convoluted& c);
-	bool operator == (const convoluted& c);
-	bool operator != (const convoluted& c);
-	
-	// constant methods:
-	int    get_numbr() const;
-	bool   get_addr1() const;
-	char*  get_addr2() const;
-	size_t get_bytes() const;
-
-	// friend functions:
-	friend bool operator >  (const convoluted& c1, const convoluted& c2);
-	friend std::ostream& operator << (std::ostream& out, const convoluted& c); // they assume: one > two
-	friend bool compare_numbr(const convoluted& one, const convoluted& two);
-	friend bool compare_addss(const convoluted& one, const convoluted& two);
-	friend bool compare_strng(const convoluted& one, const convoluted& two);
-	
-	friend bit  swap(convoluted& c1, convoluted& c2);
-	friend bool absolute_equality(const convoluted& c1, const convoluted& c2);
-};
-
-// comments:
-// convoluted::number doesn't depend on the char array, but helps at initializing it in constructors
-// this class should look arbitrarly built, the structures have to work as expected even if this header doesn't make sense
-// address2 can be nullptr
-
-//------------------------------------------------
-// auxiliary utility:
-
-bool letter(const char& character)
-{
-	if (character < 'A' || character > 'z')
-		return false;
-	if (character > 'Z' && character < 'a')
-		return false;
-	return true;
-}
-
-//------------------------------------------------
-// constructors:
-
-convoluted::~convoluted()
-{
-	delete address1;
-	if (address2)
-		delete[]address2;
-}
-
-convoluted::convoluted(int number, const bool& one, const char* two) : number(number)
-{
-	address1 = new bool {one};
-	address2 = new char[number];
-	
-	size_t sz = strlen(two) + 1;
-	sz = sz < number ? sz : number;
-	for (size_t i = 0; i < sz - 1; i++)
+	// Multi-field element with no natural order and heap-owned text; tests order it through the comparators below.
+	class compound_type
 	{
-		if (0 == two[i])
+	public:
+		compound_type() = default;
+		compound_type(int number, bool flag, std::string text);
+
+		int get_number() const noexcept;
+		bool get_flag() const noexcept;
+		const std::string& get_text() const noexcept;
+
+		bool operator==(const compound_type& other) const;
+		bool operator!=(const compound_type& other) const;
+
+		friend std::ostream& operator<<(std::ostream& out, const compound_type& value)
 		{
-			this->address2[i] = 0;
-			break;
+			return out << '{' << value.number << ", " << value.flag << ", " << value.text << '}';
 		}
 
-		address2[i] = letter(two[i]) ? two[i] : 'A';
-	}
+	private:
+		int number = 0;
+		bool flag = false;
+		std::string text;
+	};
 
-	address2[sz - 1] = 0;
-}
-
-convoluted::convoluted(int null) : number(0), address1(new bool{ false }), address2(nullptr) {}
-
-convoluted::convoluted(const convoluted& c)
-{
-	this->number = c.number;
-	this->address1 = new bool{ *c.address1 };
-	
-	if (nullptr == c.address2)
+	struct by_number
 	{
-		this->address2 = nullptr;
-		return;
+		bool operator()(const compound_type& left, const compound_type& right) const;
+	};
+
+	struct by_flag
+	{
+		bool operator()(const compound_type& left, const compound_type& right) const;
+	};
+
+	struct by_text
+	{
+		bool operator()(const compound_type& left, const compound_type& right) const;
+	};
+
+	struct compound_hash
+	{
+		std::size_t operator()(const compound_type& value) const;
+	};
+
+	//------------------------------------------------
+
+	inline compound_type::compound_type(int number, bool flag, std::string text)
+		: number(number), flag(flag), text(std::move(text)) {}
+
+	inline int compound_type::get_number() const noexcept
+	{
+		return number;
 	}
 
-	size_t sz = strlen(c.address2) + 1;
-	this->address2 = new char[sz];
-	for (size_t i = 0; i < sz; i++)
-		this->address2[i] = c.address2[i];
-}
+	inline bool compound_type::get_flag() const noexcept
+	{
+		return flag;
+	}
 
-//------------------------------------------------
-// modifier methods: 
+	inline const std::string& compound_type::get_text() const noexcept
+	{
+		return text;
+	}
 
-convoluted& convoluted::operator = (const convoluted& c)
-{
-	this->number = c.number;
-	
-	delete address1;
-	if(address2)
-		delete[]address2;
-	address1 = nullptr;
-	address2 = nullptr;
+	inline bool compound_type::operator==(const compound_type& other) const
+	{
+		return number == other.number && flag == other.flag && text == other.text;
+	}
 
-	address1 = new bool{ *c.address1 };
-	
-	if (c.address2 == nullptr)
-		return *this;
-	size_t sz = strlen(c.address2) + 1;
-	address2 = new char[sz];
-	for (size_t i = 0; i < sz; i++)
-		this->address2[i] = c.address2[i];
+	inline bool compound_type::operator!=(const compound_type& other) const
+	{
+		return !(*this == other);
+	}
 
-	return *this;
-}
+	inline bool by_number::operator()(const compound_type& left, const compound_type& right) const
+	{
+		return left.get_number() < right.get_number();
+	}
 
-//------------------------------------------------
-// specific methods: 
+	inline bool by_flag::operator()(const compound_type& left, const compound_type& right) const
+	{
+		return left.get_flag() < right.get_flag();
+	}
 
-void convoluted::set_number(const int& value)
-{
-	this->number = value;
-}
+	inline bool by_text::operator()(const compound_type& left, const compound_type& right) const
+	{
+		return left.get_text() < right.get_text();
+	}
 
-bool convoluted::operator <  (const convoluted& c)
-{
-	if (address2 == nullptr)
-		return false;
-	if (c.address2 == nullptr)
-		return true;
-	return address2[0] < c.address2[0];
-}
-
-bool convoluted::operator <= (const convoluted& c)
-{
-	return (*this < c || *this == c);
-}
-
-bool convoluted::operator >  (const convoluted& c)
-{
-	if (address2 == nullptr)
-		return false;
-	if (c.address2 == nullptr)
-		return true;
-	return address2[0] > c.address2[0];
-}
-
-bool convoluted::operator >= (const convoluted& c)
-{
-	return (*this > c || *this == c);
-}
-
-bool convoluted::operator == (const convoluted& c)
-{
-	if (address2 == nullptr)
-		return false;
-	if (c.address2 == nullptr)
-		return true;
-	return address2[0] == c.address2[0];
-}
-
-bool convoluted::operator != (const convoluted& c)
-{
-	return !(*this == c);
-}
-
-//------------------------------------------------
-// constant methods:
-
-int convoluted::get_numbr() const
-{
-	return number;
-}
-
-bool convoluted::get_addr1() const
-{
-	return *address1;
-}
-
-char* convoluted::get_addr2() const
-{
-	return address2;
-}
-
-size_t convoluted::get_bytes() const
-{
-	return size_t(number + 5);
-}
-
-//------------------------------------------------
-// friend functions:
-
-bool operator > (const convoluted& c1, const convoluted& c2)
-{
-	if (c1.address2 == nullptr)
-		return false;
-	if (c2.address2 == nullptr)
-		return true;
-	return c1.address2[0] > c2.address2[0];
-}
-
-std::ostream& operator << (std::ostream& out, const convoluted& c)
-{
-	out << "\n";
-	out << "|" << "----------" << "----------" << "----------" << "|\n";
-	out << "|" << " number: " << c.number << "\n";
-	out << "|" << " abstract: " << *c.address1 << "\n";
-	out << "|" << " text: ";
-	
-	if (c.address2) out << c.address2;
-	else out << "nullptr";
-	out << "\n";
-	out << "|" << "----------" << "----------" << "----------" << "|\n" << "\n";
-	return out;
-}
-
-bool compare_numbr(const convoluted& one, const convoluted& two)
-{
-	if (one.number == two.number)
-		return compare_addss(one, two);
-	return one.number > two.number;
-}
-
-bool compare_addss(const convoluted& one, const convoluted& two)
-{
-	if (*one.address1 == *two.address1)
-		return compare_strng(one, two);
-	return *one.address1 > *two.address1;
-}
-
-bool compare_strng(const convoluted& one, const convoluted& two)
-{
-	// patch
-	if (one.address2 == nullptr)
-		return false;
-	if (one.address2 && two.address2 == nullptr)
-		return true;
-	
-	if (strcmp(one.address2, two.address2) > 0)
-		return true;
-	return false;
-}
-
-bit swap(convoluted& c1, convoluted& c2)
-{
-	// number
-	int nr = c1.number;
-	c1.number = c2.number;
-	c2.number = nr;
-	
-	// address1
-	bool ad = *c1.address1;
-	*c1.address1 = false == *c2.address1 ? false : true;
-	*c2.address1 = false == ad ? false: true;
-	
-	// address2
-	char* ptr = c1.address2;
-	c1.address2 = c2.address2;
-	c2.address2 = ptr;
-	
-	return 0;
-}
-
-bool absolute_equality(const convoluted& c1, const convoluted& c2)
-{
-	if (c1.number != c2.number)
-		return false;
-	if (*c1.address1 != *c2.address1)
-		return false;
-	
-	if (c1.address2 == nullptr && c2.address2 == nullptr)
-		return true;
-	if ((c1.address2 == nullptr && c2.address2) || c1.address2 && c2.address2 == nullptr)
-		return false;
-	if (strcmp(c1.address2, c2.address2) != 0)
-		return false;
-	return true;
+	inline std::size_t compound_hash::operator()(const compound_type& value) const
+	{
+		return std::hash<std::string>()(value.get_text()) ^ std::hash<int>()(value.get_number());
+	}
 }
