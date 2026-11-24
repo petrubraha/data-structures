@@ -1,6 +1,6 @@
 #pragma once
 #include <algorithm>
-#include "node/tree_node.hpp"
+#include "detail/node/tree_node.hpp"
 
 namespace ds::detail
 {

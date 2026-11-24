@@ -8,18 +8,18 @@
 #include <new>
 #include <type_traits>
 #include <utility>
-#include "iterator/array_iterator.hpp"
-#include "sorting/bubble_sort.hpp"
-#include "sorting/heap_sort.hpp"
-#include "sorting/insertion_sort.hpp"
-#include "sorting/merge_sort.hpp"
-#include "sorting/quick_sort.hpp"
-#include "sorting/selection_sort.hpp"
-#include "utils/constants.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/linear_queries.hpp"
-#include "utils/printing.hpp"
+#include "detail/iterator/array_iterator.hpp"
+#include "detail/sorting/bubble_sort.hpp"
+#include "detail/sorting/heap_sort.hpp"
+#include "detail/sorting/insertion_sort.hpp"
+#include "detail/sorting/merge_sort.hpp"
+#include "detail/sorting/quick_sort.hpp"
+#include "detail/sorting/selection_sort.hpp"
+#include "detail/utils/constants.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/linear_queries.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds
 {

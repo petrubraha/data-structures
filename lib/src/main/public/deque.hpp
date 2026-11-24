@@ -1,14 +1,15 @@
 #pragma once
 #include <cstddef>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
 #include <utility>
-#include "iterator/list_iterator.hpp"
-#include "node/deque_node.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/linear_queries.hpp"
-#include "utils/printing.hpp"
+#include "detail/iterator/list_iterator.hpp"
+#include "detail/node/deque_node.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/linear_queries.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds
 {
@@ -50,6 +51,7 @@ namespace ds
 		bool operator!=(const deque& other) const;
 		size_type size() const noexcept;
 		bool empty() const noexcept;
+		void print() const;
 		const_reference front() const;
 		const_reference back() const;
 
@@ -224,6 +226,12 @@ namespace ds
 	bool deque<T>::empty() const noexcept
 	{
 		return length == 0;
+	}
+
+	template <class T>
+	void deque<T>::print() const
+	{
+		std::cout << *this << '\n';
 	}
 
 	template <class T>

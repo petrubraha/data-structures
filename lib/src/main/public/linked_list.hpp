@@ -6,12 +6,12 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
-#include "iterator/list_iterator.hpp"
-#include "node/list_node.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/linear_queries.hpp"
-#include "utils/printing.hpp"
+#include "detail/iterator/list_iterator.hpp"
+#include "detail/node/list_node.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/linear_queries.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds
 {

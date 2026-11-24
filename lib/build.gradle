@@ -56,9 +56,6 @@ library {
 
     // The library is header-only; a static archive avoids an empty DLL.
     linkage = [Linkage.STATIC]
-
-    // Public headers include the internal ones, so a consumer needs both directories on its include path.
-    publicHeaders.from('src/main/public', 'src/main/headers')
 }
 
 unitTest {

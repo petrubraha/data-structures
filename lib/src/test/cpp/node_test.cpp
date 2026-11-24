@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <string>
-#include "node/deque_node.hpp"
-#include "node/list_node.hpp"
-#include "node/tree_node.hpp"
+#include "detail/node/deque_node.hpp"
+#include "detail/node/list_node.hpp"
+#include "detail/node/tree_node.hpp"
 
 namespace
 {

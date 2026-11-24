@@ -8,3 +8,4 @@
 #include "deque.hpp"
 #include "heap.hpp"
 #include "tree.hpp"
+#include "hash_map.hpp"

@@ -1,10 +1,11 @@
 #include <gtest/gtest.h>
-#include "iterator/array_iterator.hpp"
-#include "iterator/list_iterator.hpp"
-#include "iterator/tree_iterator.hpp"
-#include "node/deque_node.hpp"
-#include "node/list_node.hpp"
-#include "node/tree_node.hpp"
+#include "detail/iterator/array_iterator.hpp"
+#include "detail/iterator/hash_iterator.hpp"
+#include "detail/iterator/list_iterator.hpp"
+#include "detail/iterator/tree_iterator.hpp"
+#include "detail/node/deque_node.hpp"
+#include "detail/node/list_node.hpp"
+#include "detail/node/tree_node.hpp"
 
 namespace
 {
@@ -91,12 +92,29 @@ TEST(tree_iterator, visits_nodes_in_order)
 	EXPECT_FALSE(++current != tree_reader(nullptr));
 }
 
+TEST(hash_iterator, skips_empty_buckets_and_walks_each_chain)
+{
+	list_node second(2);
+	list_node first(1);
+	first.next = &second;
+	list_node third(3);
+	list_node* buckets[4] = { nullptr, &first, nullptr, &third };
+	ds::detail::hash_iterator<list_node, const int> current(buckets, 4, 0);
+	const ds::detail::hash_iterator<list_node, const int> end(buckets, 4, 4);
+
+	EXPECT_EQ(1, *current);
+	EXPECT_EQ(2, *++current);
+	EXPECT_EQ(3, *++current);
+	EXPECT_FALSE(++current != end);
+}
+
 TEST(iterator_death_test, dereferencing_or_advancing_past_the_end_terminates)
 {
 	int values[1] = { 1 };
 	ds::detail::array_iterator<int> array_end(values + 1, values + 1);
 	ds::detail::list_iterator<list_node, int> list_end(nullptr);
 	ds::detail::tree_iterator<tree_node, int> tree_end(nullptr);
+	ds::detail::hash_iterator<list_node, int> hash_end(nullptr, 0, 0);
 
 	EXPECT_DEATH(*array_end, "array_iterator::operator\\*: dereferenced past the end");
 	EXPECT_DEATH(++array_end, "array_iterator::operator\\+\\+: advanced past the end");
@@ -104,4 +122,6 @@ TEST(iterator_death_test, dereferencing_or_advancing_past_the_end_terminates)
 	EXPECT_DEATH(++list_end, "list_iterator::operator\\+\\+: advanced past the end");
 	EXPECT_DEATH(*tree_end, "tree_iterator::operator\\*: dereferenced past the end");
 	EXPECT_DEATH(++tree_end, "tree_iterator::operator\\+\\+: advanced past the end");
+	EXPECT_DEATH(*hash_end, "hash_iterator::operator\\*: dereferenced past the end");
+	EXPECT_DEATH(++hash_end, "hash_iterator::operator\\+\\+: advanced past the end");
 }
