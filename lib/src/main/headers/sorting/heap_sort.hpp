@@ -27,12 +27,19 @@ namespace ds::detail
 		}
 	}
 
+	// Arranges the first length elements into a heap in linear time.
+	template <class sequence, class ordering>
+	void build_heap(sequence& values, std::size_t length, const ordering& before)
+	{
+		for (std::size_t parent = length / 2; parent > 0; --parent)
+			sift_down(values, parent - 1, length, before);
+	}
+
 	// Unstable. In place, with no extra memory.
 	template <class sequence, class ordering>
 	void heap_sort(sequence& values, std::size_t length, const ordering& before)
 	{
-		for (std::size_t parent = length / 2; parent > 0; --parent)
-			sift_down(values, parent - 1, length, before);
+		build_heap(values, length, before);
 
 		for (std::size_t unsorted = length; unsorted > 1; --unsorted)
 		{
