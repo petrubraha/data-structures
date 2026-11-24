@@ -1,181 +1,325 @@
 #pragma once
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <utility>
+#include "iterator/list_iterator.hpp"
+#include "node/deque_node.hpp"
+#include "utils/conversion.hpp"
 #include "utils/exceptions.hpp"
-#include "utils/constants.hpp"
+#include "utils/linear_queries.hpp"
+#include "utils/printing.hpp"
 
-#include "node/node_double_list.h"
-
-/* comments:
-	- simplified version of a double linked list;
-	- its purpose is to support adaptors and hash_table
-	- to serve the developer and not the user
-*/
-
-template <class T = int>
-class double_linked_list
+namespace ds
 {
-	structure_typedefs;
-	typedef node_double_list<T>* ptr;
-	typedef const node_double_list<T>* ptr_return;
-
-public:
-	// constructors:
-	~double_linked_list();
-	double_linked_list();
-
-	// modifier methods:
-	double_linked_list<T>& clear();
-	double_linked_list<T>& set_f(fct f);
-
-	// specific methods:
-	double_linked_list<T>& insert(const node_double_list<T>* const value, node_double_list<T>* const before_inserted = head_node);
-	double_linked_list<T>& remove(node_double_list<T>*& node);
-
-	// constant methods:
-	bool   empty() const;
-	void   print() const;
-
-	ptr_return get_node(szt index) const;
-	ptr_return get_head() const;
-	ptr_return get_tail() const;
-
-private:
-	// data members:
-	node_double_list<T>* head;
-	node_double_list<T>* tail;
-
-	// auxiliar utility:
-	fct compare;
-
-public:
-	static node_double_list<T>* const head_node;
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-double_linked_list<T>::~double_linked_list()
-{
-	clear();
-}
-
-template <class T>
-double_linked_list<T>::double_linked_list()
-{
-	head = tail = nullptr;
-	compare = [](t x, t y)->bool { return x > y; };
-}
-
-//------------------------------------------------
-// modifier methods:
-
-template <class T>
-double_linked_list<T>& double_linked_list<T>::clear()
-{
-	ptr it = head;
-	while (it)
+	// Double-ended queue on a doubly linked chain: push and pop are O(1) at both ends.
+	template <class T>
+	class deque
 	{
-		head = it->successor[0];
-		delete it;
-		it = head;
+		using node_type = detail::deque_node<T>;
+
+	public:
+		using value_type = T;
+		using size_type = std::size_t;
+		using reference = T&;
+		using const_reference = const T&;
+		using iterator = detail::list_iterator<node_type, T>;
+		using const_iterator = detail::list_iterator<node_type, const T>;
+
+		// Constructors and destructor.
+		~deque();
+		deque() noexcept = default;
+		deque(std::initializer_list<T> initial);
+		deque(const T* source, size_type count);
+		deque(const deque& other);
+		deque(deque&& other) noexcept;
+
+		// Modifier methods.
+		deque& operator=(const deque& other);
+		deque& operator=(deque&& other) noexcept;
+		deque& clear() noexcept;
+
+		// Specific methods.
+		deque& push_front(T value);
+		deque& push_back(T value);
+		deque& pop_front();
+		deque& pop_back();
+
+		// Constant methods.
+		bool operator==(const deque& other) const;
+		bool operator!=(const deque& other) const;
+		size_type size() const noexcept;
+		bool empty() const noexcept;
+		const_reference front() const;
+		const_reference back() const;
+
+		// Iterator methods.
+		iterator begin() noexcept;
+		iterator end() noexcept;
+		const_iterator begin() const noexcept;
+		const_iterator end() const noexcept;
+
+		// Friend functions.
+		friend std::ostream& operator<<(std::ostream& out, const deque& sequence)
+		{
+			return detail::write_elements(out, sequence);
+		}
+
+		friend std::unique_ptr<T[]> convert(const deque& sequence)
+		{
+			return detail::copy_elements<T>(sequence, sequence.length);
+		}
+
+	private:
+		node_type* head = nullptr;
+		node_type* tail = nullptr;
+		size_type length = 0;
+
+		template <class position>
+		void append_all(detail::position_range<position> source);
+		void unlink(node_type* removed) noexcept;
+		void steal(deque& other) noexcept;
+		void swap(deque& other) noexcept;
+	};
+
+	//------------------------------------------------
+	// Constructors and destructor.
+
+	template <class T>
+	deque<T>::~deque()
+	{
+		clear();
 	}
 
-	head = tail = nullptr;
-	return *this;
-}
+	template <class T>
+	deque<T>::deque(std::initializer_list<T> initial) : deque(initial.begin(), initial.size()) {}
 
-template <class T>
-double_linked_list<T>& double_linked_list<T>::set_f(fct f)
-{
-	compare = f;
-}
-
-//------------------------------------------------
-// specific methods:
-
-template <class T>
-double_linked_list<T>& double_linked_list<T>::insert(const node_double_list<T>* const value, node_double_list<T>* const before_inserted)
-{
-	ptr new_node = new node_double_list<T>(value->get());
-	if (head_node == before_inserted)
+	template <class T>
+	deque<T>::deque(const T* source, size_type count)
 	{
-		new_node->successor[0] = head;
-		head->predecessor[0] = new_node;
-		head = new_node;
+		append_all(detail::position_range<const T*>{ source, source + count });
+	}
+
+	template <class T>
+	deque<T>::deque(const deque& other)
+	{
+		append_all(detail::position_range<const_iterator>{ other.begin(), other.end() });
+	}
+
+	template <class T>
+	deque<T>::deque(deque&& other) noexcept
+	{
+		steal(other);
+	}
+
+	//------------------------------------------------
+	// Modifier methods.
+
+	template <class T>
+	deque<T>& deque<T>::operator=(const deque& other)
+	{
+		deque copy(other);
+		swap(copy);
 		return *this;
 	}
 
-	new_node->successor[0] = before_inserted->successor[0];
-	before_inserted->successor[0] = new_node;
-	new_node->predecessor[0] = before_inserted;
+	template <class T>
+	deque<T>& deque<T>::operator=(deque&& other) noexcept
+	{
+		if (this == &other)
+			return *this;
 
-	if (nullptr == new_node->successor[0])
-		tail = new_node;
-	
-	return *this;
+		clear();
+		steal(other);
+		return *this;
+	}
+
+	template <class T>
+	deque<T>& deque<T>::clear() noexcept
+	{
+		while (head != nullptr)
+			unlink(head);
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Specific methods.
+
+	template <class T>
+	deque<T>& deque<T>::push_front(T value)
+	{
+		node_type* fresh = new node_type(std::move(value));
+		fresh->next = head;
+		if (head != nullptr)
+			head->previous = fresh;
+		else
+			tail = fresh;
+
+		head = fresh;
+		++length;
+		return *this;
+	}
+
+	template <class T>
+	deque<T>& deque<T>::push_back(T value)
+	{
+		node_type* fresh = new node_type(std::move(value));
+		fresh->previous = tail;
+		if (tail != nullptr)
+			tail->next = fresh;
+		else
+			head = fresh;
+
+		tail = fresh;
+		++length;
+		return *this;
+	}
+
+	template <class T>
+	deque<T>& deque<T>::pop_front()
+	{
+		if (empty())
+			throw empty_error("deque::pop_front");
+		unlink(head);
+		return *this;
+	}
+
+	template <class T>
+	deque<T>& deque<T>::pop_back()
+	{
+		if (empty())
+			throw empty_error("deque::pop_back");
+		unlink(tail);
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Constant methods.
+
+	template <class T>
+	bool deque<T>::operator==(const deque& other) const
+	{
+		if (length != other.length)
+			return false;
+
+		for (const node_type *mine = head, *theirs = other.head; mine != nullptr; mine = mine->next, theirs = theirs->next)
+			if (!(mine->get() == theirs->get()))
+				return false;
+		return true;
+	}
+
+	template <class T>
+	bool deque<T>::operator!=(const deque& other) const
+	{
+		return !(*this == other);
+	}
+
+	template <class T>
+	typename deque<T>::size_type deque<T>::size() const noexcept
+	{
+		return length;
+	}
+
+	template <class T>
+	bool deque<T>::empty() const noexcept
+	{
+		return length == 0;
+	}
+
+	template <class T>
+	typename deque<T>::const_reference deque<T>::front() const
+	{
+		if (empty())
+			throw empty_error("deque::front");
+		return head->get();
+	}
+
+	template <class T>
+	typename deque<T>::const_reference deque<T>::back() const
+	{
+		if (empty())
+			throw empty_error("deque::back");
+		return tail->get();
+	}
+
+	//------------------------------------------------
+	// Iterator methods.
+
+	template <class T>
+	typename deque<T>::iterator deque<T>::begin() noexcept
+	{
+		return iterator(head);
+	}
+
+	template <class T>
+	typename deque<T>::iterator deque<T>::end() noexcept
+	{
+		return iterator(nullptr);
+	}
+
+	template <class T>
+	typename deque<T>::const_iterator deque<T>::begin() const noexcept
+	{
+		return const_iterator(head);
+	}
+
+	template <class T>
+	typename deque<T>::const_iterator deque<T>::end() const noexcept
+	{
+		return const_iterator(nullptr);
+	}
+
+	//------------------------------------------------
+	// Private helpers.
+
+	// Appends copies of the source; on failure the partially built chain is released before rethrowing.
+	template <class T>
+	template <class position>
+	void deque<T>::append_all(detail::position_range<position> source)
+	{
+		try
+		{
+			for (position current = source.first; current != source.last; ++current)
+				push_back(*current);
+		}
+		catch (...)
+		{
+			clear();
+			throw;
+		}
+	}
+
+	template <class T>
+	void deque<T>::unlink(node_type* removed) noexcept
+	{
+		if (removed->previous != nullptr)
+			removed->previous->next = removed->next;
+		else
+			head = removed->next;
+
+		if (removed->next != nullptr)
+			removed->next->previous = removed->previous;
+		else
+			tail = removed->previous;
+
+		delete removed;
+		--length;
+	}
+
+	template <class T>
+	void deque<T>::steal(deque& other) noexcept
+	{
+		head = std::exchange(other.head, nullptr);
+		tail = std::exchange(other.tail, nullptr);
+		length = std::exchange(other.length, 0);
+	}
+
+	template <class T>
+	void deque<T>::swap(deque& other) noexcept
+	{
+		using std::swap;
+		swap(head, other.head);
+		swap(tail, other.tail);
+		swap(length, other.length);
+	}
 }
-
-template <class T>
-double_linked_list<T>& double_linked_list<T>::remove(node_double_list<T>*& node)
-{
-	if (node->predecessor[0])
-		node->predecessor[0]->successor[0] = node->successor[0];
-	else
-		head = node->successor[0];
-
-	if (node->successor[0])
-		node->successor[0]->predecessor[0] = node->predecessor[0];
-	else
-		tail = node->predecessor[0];
-	
-	delete node;
-	return *this;
-}
-
-//------------------------------------------------
-// constant methods:
-
-template <class T>
-bool double_linked_list<T>::empty() const
-{
-	return (nullptr == head && nullptr == tail);
-}
-
-template <class T>
-void double_linked_list<T>::print() const
-{
-	if (empty())
-		return;
-
-	for (ptr it = head; it; it = it->successor[0])
-		std::cout << it->get() << ' ';
-	std::cout << '\n';
-}
-
-template <class T>
-const node_double_list<T>* double_linked_list<T>::get_node(szt index) const
-{
-	ptr it = head;
-	FOR(index)
-		it = it->successor[0];
-
-	return it;
-}
-
-template <class T>
-const node_double_list<T>* double_linked_list<T>::get_head() const
-{
-	return head;
-}
-
-template <class T>
-const node_double_list<T>* double_linked_list<T>::get_tail() const
-{
-	return tail;
-}
-
-//------------------------------------------------
-// auxiliar utility:
-
-template <class T>
-node_double_list<T>* const double_linked_list<T>::head_node = nullptr;
