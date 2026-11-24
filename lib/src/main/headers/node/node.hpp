@@ -1,64 +1,48 @@
 #pragma once
+#include <utility>
 
-#define left_child 0
-#define rght_child 1
-
-template <class T, typename node_type, size_t arity>
-class node
+namespace ds::detail
 {
-	// data members:
-	mutable T data;
+	// Value holder shared by every linked node. Construction is protected, so only a concrete node exists.
+	template <class T>
+	class node
+	{
+	public:
+		node(const node&) = delete;
+		node& operator=(const node&) = delete;
 
-public:
-	// auxiliar utility:
-	node_type* successor[arity];
-	
-	// constructors:
-	virtual ~node() = 0;
-	node(const T& value);
+		T& get() noexcept;
+		const T& get() const noexcept;
+		void set(T replacement);
 
-	// specific methods:
-	void set(const T& value) const;
+	protected:
+		explicit node(T initial);
+		~node() = default;
 
-	// constant methods:
-	T&		get() const;
-	size_t  get_arity() const;
-};
+	private:
+		T value;
+	};
 
-//------------------------------------------------
-// constructors:
+	//------------------------------------------------
 
-template <class T, typename node_type, size_t arity>
-node<T, node_type, arity>::~node() {}
+	template <class T>
+	node<T>::node(T initial) : value(std::move(initial)) {}
 
-template <class T, typename node_type, size_t arity>
-node<T, node_type, arity>::node(const T& value)
-{
-	this->data = value;
-	for (size_t i = 0; i < arity; i++)
-		this->successor[i] = nullptr;
-}
+	template <class T>
+	T& node<T>::get() noexcept
+	{
+		return value;
+	}
 
-//------------------------------------------------
-// specific methods:
+	template <class T>
+	const T& node<T>::get() const noexcept
+	{
+		return value;
+	}
 
-template <class T, typename node_type, size_t arity>
-void node<T, node_type, arity>::set(const T& value) const
-{
-	data = value;
-}
-
-//------------------------------------------------
-// constant methods:
-
-template <class T, typename node_type, size_t arity>
-T& node<T, node_type, arity>::get() const
-{
-	return (T&)data;
-}
-
-template <class T, typename node_type, size_t arity>
-size_t node<T, node_type, arity>::get_arity() const
-{
-	return arity;
+	template <class T>
+	void node<T>::set(T replacement)
+	{
+		value = std::move(replacement);
+	}
 }

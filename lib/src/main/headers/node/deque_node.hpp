@@ -1,28 +1,16 @@
 #pragma once
-#include "node.h"
+#include "node.hpp"
 
-// auxiliar utility:
-template <class T>
-class node_double_list : public node<T, node_double_list<T>, 1>
+namespace ds::detail
 {
-public:
-	// auxiliar utility:
-	// node_type* successor[arity];
-	node_type* predecessor[arity];
+	// Doubly linked node.
+	template <class T>
+	class deque_node : public node<T>
+	{
+	public:
+		explicit deque_node(T initial) : node<T>(std::move(initial)) {}
 
-	// constructors:
-	~node_double_list();
-	node_double_list(const T& value = NULL);
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-node_double_list<T>::~node_double_list() {}
-
-template <class T>
-node_double_list<T>::node_double_list(const T& value) : node<T, node_double_list<T>, 1>(value)
-{
-	this->predecessor[0] = nullptr;
+		deque_node* previous = nullptr;
+		deque_node* next = nullptr;
+	};
 }

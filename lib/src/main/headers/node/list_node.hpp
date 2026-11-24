@@ -1,20 +1,15 @@
 #pragma once
-#include "node.h"
+#include "node.hpp"
 
-template <class T>
-class node_list : public node<T, node_list<T>, 1>
+namespace ds::detail
 {
-public:
-	// constructors:
-	node_list(const T& value = NULL);
-	~node_list();
-};
+	// Singly linked node.
+	template <class T>
+	class list_node : public node<T>
+	{
+	public:
+		explicit list_node(T initial) : node<T>(std::move(initial)) {}
 
-//------------------------------------------------
-// constructors:
-
-template <class T>
-node_list<T>::~node_list() {}
-
-template <class T>
-node_list<T>::node_list(const T& value) : node<T, node_list<T>, 1>(value) {}
+		list_node* next = nullptr;
+	};
+}

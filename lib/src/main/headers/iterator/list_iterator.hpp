@@ -1,46 +1,57 @@
 #pragma once
-#include "basic_iterator.h"
-#include "../node/node_list.h"
+#include "utils/exceptions.hpp"
 
-template <class T>
-class linked_list_iterator : public basic_iterator<T, linked_list_iterator<T>>
+namespace ds
 {
-	// data members:
-	node_list<T>* value;
-
-public:
-	// constructors:
-	linked_list_iterator(node_list<T>*& value);
-
-	// specific methods:
-	T    operator  * () const;
-	void operator ++ ();
-	bool operator != (const linked_list_iterator<T>& it) const;
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-linked_list_iterator<T>::linked_list_iterator(node_list<T>*& value) : value(value) {}
-
-//------------------------------------------------
-// specific methods:
-
-template <class T>
-T linked_list_iterator<T>::operator *() const
-{
-	return value->get();
+	template <class T, class compare>
+	class linked_list;
 }
 
-template <class T>
-void linked_list_iterator<T>::operator ++()
+namespace ds::detail
 {
-	value = value->successor[0];
-}
+	// Walks the next links of a list or deque node chain. A const-qualified T gives read-only traversal.
+	template <class node_type, class T>
+	class list_iterator
+	{
+	public:
+		explicit list_iterator(node_type* current) noexcept;
 
-template <class T>
-bool linked_list_iterator<T>::operator != (const linked_list_iterator<T>& it) const
-{
-	return value != it.value;
+		T& operator*() const noexcept;
+		list_iterator& operator++() noexcept;
+		bool operator!=(const list_iterator& other) const noexcept;
+
+	private:
+		template <class, class>
+		friend class ds::linked_list;
+
+		node_type* current;
+	};
+
+	//------------------------------------------------
+
+	template <class node_type, class T>
+	list_iterator<node_type, T>::list_iterator(node_type* current) noexcept : current(current) {}
+
+	template <class node_type, class T>
+	T& list_iterator<node_type, T>::operator*() const noexcept
+	{
+		if (current == nullptr)
+			fail_fast("list_iterator::operator*: dereferenced past the end");
+		return current->get();
+	}
+
+	template <class node_type, class T>
+	list_iterator<node_type, T>& list_iterator<node_type, T>::operator++() noexcept
+	{
+		if (current == nullptr)
+			fail_fast("list_iterator::operator++: advanced past the end");
+		current = current->next;
+		return *this;
+	}
+
+	template <class node_type, class T>
+	bool list_iterator<node_type, T>::operator!=(const list_iterator& other) const noexcept
+	{
+		return current != other.current;
+	}
 }

@@ -1,45 +1,49 @@
 #pragma once
-#include "basic_iterator.h"
+#include "utils/exceptions.hpp"
 
-template <class T>
-class array_iterator : public basic_iterator<T, array_iterator<T>>
+namespace ds::detail
 {
-	// data members:
-	T* value;
+	// Walks a contiguous block. A const-qualified T gives read-only traversal.
+	template <class T>
+	class array_iterator
+	{
+	public:
+		array_iterator(T* current, T* boundary) noexcept;
 
-public:
-	// constructors:
-	array_iterator(T& value);
+		T& operator*() const noexcept;
+		array_iterator& operator++() noexcept;
+		bool operator!=(const array_iterator& other) const noexcept;
 
-	// specific methods:
-	T		operator  * () const;
-	void	operator ++ ();
-	bool	operator != (const array_iterator<T>& it) const;
-};
+	private:
+		T* current;
+		T* boundary;
+	};
 
-//------------------------------------------------
-// constructors:
+	//------------------------------------------------
 
-template <class T>
-array_iterator<T>::array_iterator(T& value) : value(&value) {}
+	template <class T>
+	array_iterator<T>::array_iterator(T* current, T* boundary) noexcept : current(current), boundary(boundary) {}
 
-//------------------------------------------------
-// specific methods:
+	template <class T>
+	T& array_iterator<T>::operator*() const noexcept
+	{
+		if (current == boundary)
+			fail_fast("array_iterator::operator*: dereferenced past the end");
+		return *current;
+	}
 
-template <class T>
-T array_iterator<T>::operator *() const
-{
-	return *value;
+	template <class T>
+	array_iterator<T>& array_iterator<T>::operator++() noexcept
+	{
+		if (current == boundary)
+			fail_fast("array_iterator::operator++: advanced past the end");
+		++current;
+		return *this;
+	}
+
+	template <class T>
+	bool array_iterator<T>::operator!=(const array_iterator& other) const noexcept
+	{
+		return current != other.current;
+	}
 }
-
-template <class T>
-void array_iterator<T>::operator ++()
-{
-	value++;
-}
-
-template <class T>
-bool array_iterator<T>::operator !=(const array_iterator<T>& it) const
-{
-	return value != it.value;
-} 

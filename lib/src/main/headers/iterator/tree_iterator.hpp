@@ -1,87 +1,58 @@
 #pragma once
+#include "node/tree_node.hpp"
 #include "utils/exceptions.hpp"
-#include "utils/constants.hpp"
-#include "basic_iterator.h"
-#include "dev/node/node_avlt.h"
-#include "stack.h"
 
-template <class T>
-class avl_iterator : public basic_iterator<T, avl_iterator<T>>
+namespace ds
 {
-	// data members:
-	mutable node_avlt<T>* curent;
-	mutable stack<node_avlt<T>*> nodes;
-	mutable bool comparison_op, dereference_op;
-
-public:
-	// constructors:
-	avl_iterator(node_avlt<T>* const value);
-	avl_iterator();
-
-	// specific methods:
-	bool	operator != (const avl_iterator<T>& it) const;
-	T		operator  * () const;
-	void	operator ++ ();
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-avl_iterator<T>::avl_iterator(node_avlt<T>* const value) : nodes()
-{
-	curent = value;
-	comparison_op = dereference_op = false;
+	template <class balancing, class T, class compare>
+	class tree;
 }
 
-template <class T>
-avl_iterator<T>::avl_iterator() : nodes()
+namespace ds::detail
 {
-	curent = nullptr; 
-	comparison_op = dereference_op = false;
-}
-
-//------------------------------------------------
-// specific methods:
-
-template <class T>
-bool avl_iterator<T>::operator != (const avl_iterator<T>& it) const
-{
-	comparison_op = true;
-	return (curent || !nodes.empty());
-}
-
-template <class T>
-T avl_iterator<T>::operator * () const
-{
-	if (false == comparison_op)
+	// Walks a binary search tree in order through parent links, so it needs no stack.
+	template <class node_type, class T>
+	class tree_iterator
 	{
-		avl_iterator<T> dummy{};
-		if (false == (*this != dummy))
-			hard_error("error - iterator: wrong order or operations");
+	public:
+		explicit tree_iterator(node_type* current) noexcept;
+
+		T& operator*() const noexcept;
+		tree_iterator& operator++() noexcept;
+		bool operator!=(const tree_iterator& other) const noexcept;
+
+	private:
+		template <class, class, class>
+		friend class ds::tree;
+
+		node_type* current;
+	};
+
+	//------------------------------------------------
+
+	template <class node_type, class T>
+	tree_iterator<node_type, T>::tree_iterator(node_type* current) noexcept : current(current) {}
+
+	template <class node_type, class T>
+	T& tree_iterator<node_type, T>::operator*() const noexcept
+	{
+		if (current == nullptr)
+			fail_fast("tree_iterator::operator*: dereferenced past the end");
+		return current->get();
 	}
 
-	comparison_op = false; 
-	dereference_op = true;
-
-	while (curent)
+	template <class node_type, class T>
+	tree_iterator<node_type, T>& tree_iterator<node_type, T>::operator++() noexcept
 	{
-		nodes.push(curent);
-		curent = curent->successor[left_child];
+		if (current == nullptr)
+			fail_fast("tree_iterator::operator++: advanced past the end");
+		current = neighbor(current, side::right);
+		return *this;
 	}
 
-	curent = nodes.top();
-	nodes.pop();
-	return curent->get();
-}
-
-
-template <class T>
-void avl_iterator<T>::operator ++ ()
-{
-	if (false == dereference_op)
-		*(*this);
-	dereference_op = false;
-
-	curent = curent->successor[rght_child];
+	template <class node_type, class T>
+	bool tree_iterator<node_type, T>::operator!=(const tree_iterator& other) const noexcept
+	{
+		return current != other.current;
+	}
 }
