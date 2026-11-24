@@ -1,614 +1,466 @@
 #pragma once
-#include "utils/exceptions.hpp"
-#include "utils/constants.hpp"
-
-#include "dev/class method interface/abstract class methods/modifier_methods.h"
-#include "dev/class method interface/array methods/array_specific.h"
-#include "dev/class method interface/array methods/array_constant.h"
-#include "dev/class method interface/array methods/array_queries.h"
-#include "dev/class method interface/abstract class methods/instance_synergy.h"
-#include "dev/class method interface/abstract class methods/iterator_methods.h"
-
-#include "dev/iterator/array_iterator.h"
-
-#include "dev/array_sorting.h"
-#include "dev/data_structure.h"
+#include <algorithm>
+#include <cstddef>
+#include <functional>
 #include <initializer_list>
+#include <iostream>
+#include <memory>
+#include <new>
+#include <type_traits>
+#include <utility>
+#include "iterator/array_iterator.hpp"
+#include "sorting/quick_sort.hpp"
+#include "utils/constants.hpp"
+#include "utils/conversion.hpp"
+#include "utils/exceptions.hpp"
+#include "utils/linear_queries.hpp"
+#include "utils/printing.hpp"
 
-/* comments:
-	- values[0 ... index_last] == 'set values'
-	- values[index_last + 1 ... n - 1] == 'non-set values'
-	- array[index_last] == the last value stored
-	- allows repeating values
-*/
-
-template <class T = int>
-class array : public data_structure<modifier_methods<T, array<T>>, array_specific<T>, 
-	array_constant<T, array<T>>, array_queries<T>, 
-	instance_synergy<array<T>>, iterator_methods<array_iterator<T>>>
+namespace ds
 {
-	// typedefs:
-	structure_typedefs;
-
-public:
-	// constructors:
-	~array();
-	array(szt n = default_array_size);
-	array(const std::initializer_list<T>& data, szt n = default_array_size);
-	array(const T* data, szt data_n, szt n = default_array_size);
-	array(const array<T>& arr);
-	array(const array<T>&& arr) noexcept;
-
-	// modifier methods:
-	array<T>& operator = (const array<T>& arr);
-	array<T>& clear();
-	array<T>& set_f(fct f);
-
-	// specific methods:
-	array<T>& sort(bit algorithm = quick_sort);
-	array<T>& insert(t value, szt index);
-	array<T>& remove(szt index);
-
-	// constant methods:
-	bool   operator == (const array<T>& arr) const;
-	size_t get_n() const;
-	size_t get_l() const;
-	void*  get_f() const;
-	bool   empty() const;
-	void   print() const;
-	T get(szt index) const;
-	bool full() const;
-
-	// query operations:
-	size_t search(t value) const;
-	size_t minimum() const;
-	size_t maximum() const;
-	size_t predcessr(szt index) const;
-	size_t successor(szt index) const;
-	T& operator [] (szt index); // get / replace method, shift to the left until there is no more empty space
-
-	// instance synergy:
-	array<T>& integrates(const array<T>& arr);
-	array<T>& eliminates(const array<T>& arr);
-	array<T>& intersects(const array<T>& arr);
-
-	// iterator methods:
-	array_iterator<T> begin() const;
-	array_iterator<T> end() const;
-
-	// friend functions:
-	template <class T> friend T* convert(const array<T>& arr);
-	template <class T> friend std::ostream& operator << (std::ostream& out, const array<T>& arr);
-
-private:
-	// data members:
-	size_t n;			// its purpose is just to allocate space
-	size_t index_last;	// gurantees that elements selected by user are initialised contiguously // index of the index_last concrete value
-	T* values;
-
-	// auxiliar utility:
-	fct  compare;
-	void shift_left(szt left_position);
-
-public:	
-	static const size_t default_array_size;
-};
-
-//------------------------------------------------
-// constructors:
-
-template <class T>
-array<T>::~array()
-{
-	delete[]values;
-}
-
-template <class T>
-array<T>::array(szt n)
-{
-	if (n * sizeof(T) > INT_MAX)
-		fatal_error("too much data on stack");
-	if (n == 0)
-		fatal_error("size of the array can not be 0");
-	
-	this->n = n;
-	index_last = SZT_ERROR;
-	values = new T[n]{};
-
-	compare = [](t x, t y)->bool { return x > y; };
-}
-
-template <class T>
-array<T>::array(const std::initializer_list<T>& data, szt n) : array<T>(n)
-{
-	if (data.size() > n)
+	// Contiguous sequence that grows on demand. The comparator orders elements for sort and the queries.
+	template <class T, class compare = std::less<T>>
+	class array
 	{
-		delete[]values;
-		fatal_error("wrong parameters");
-	}
+	public:
+		using value_type = T;
+		using size_type = std::size_t;
+		using reference = T&;
+		using const_reference = const T&;
+		using comparator = compare;
+		using iterator = detail::array_iterator<T>;
+		using const_iterator = detail::array_iterator<const T>;
 
-	for (auto key : data)
-	{
-		index_last++;
-		values[index_last] = key;
-	}
-}
+		// Constructors and destructor.
+		~array();
+		array() noexcept(std::is_nothrow_default_constructible_v<comparator>);
+		array(std::initializer_list<T> initial);
+		array(const T* source, size_type count);
+		explicit array(size_type reserved);
+		array(const array& other);
+		array(array&& other) noexcept(std::is_nothrow_move_constructible_v<comparator>);
 
-template <class T>
-array<T>::array(const T* data, szt data_n, szt n) : array<T>(n)
-{
-	if (data_n > n)
-	{
-		delete[]values;
-		fatal_error("wrong parameters");
-	}
-	
-	for (index_last = 0; index_last < data_n; index_last++)
-		values[index_last] = data[index_last];
-	index_last--;
-}
+		// Modifier methods.
+		array& operator=(const array& other);
+		array& operator=(array&& other) noexcept(std::is_nothrow_move_assignable_v<comparator>);
+		array& clear() noexcept;
+		array& set_compare(comparator replacement);
 
-template <class T>
-array<T>::array(const array<T>& arr) : array<T>(arr.n)
-{
-	for (auto i : arr)
-	{
-		index_last++;
-		this->values[index_last] = i;
-	}
-}
+		// Specific methods.
+		array& insert(T value);
+		array& insert(T value, size_type index);
+		array& remove(size_type index);
+		template <class algorithm = quick_sort, class... options>
+		array& sort();
 
-template <class T>
-array<T>::array(const array<T>&& arr) noexcept : array<T>(arr.n)
-{
-	for (auto i : arr)
-	{
-		index_last++;
-		this->values[index_last] = i;
-	}
-}
+		// Constant methods.
+		bool operator==(const array& other) const;
+		bool operator!=(const array& other) const;
+		size_type size() const noexcept;
+		size_type capacity() const noexcept;
+		bool empty() const noexcept;
+		void print() const;
+		const_reference get(size_type index) const;
+		reference operator[](size_type index);
+		const_reference operator[](size_type index) const;
 
-//------------------------------------------------
-// modifier methods:
+		// Query operations.
+		size_type search(const_reference value) const;
+		size_type minimum() const;
+		size_type maximum() const;
+		size_type predecessor(size_type index) const;
+		size_type successor(size_type index) const;
 
-template <class T>
-array<T>& array<T>::operator = (const array<T>& arr)
-{
-	this->n = arr.n;
-	this->index_last = arr.index_last;
-	delete[]this->values;
-	this->values = new T[arr.n]{};
+		// Iterator methods.
+		iterator begin() noexcept;
+		iterator end() noexcept;
+		const_iterator begin() const noexcept;
+		const_iterator end() const noexcept;
 
-	this->compare = arr.compare;
-
-	if (arr.empty())
-		return *this;
-	
-	for (size_t index = 0; index <= arr.index_last; index++)
-		this->values[index] = arr.get(index);
-
-	return *this;
-}
-
-template <class T>
-array<T>& array<T>::clear()
-{
-	if (empty())
-		return *this;
-
-	FOR(index_last)
-		values[i] = NULL;
-	values[index_last] = NULL;
-	index_last = SZT_ERROR;
-	return *this;
-}
-
-template <class T>
-array<T>& array<T>::set_f(fct f)
-{
-	this->compare = f;
-	return *this;
-}
-
-//------------------------------------------------
-// specific methods:
-
-template <class T>
-array<T>& array<T>::sort(bit algorithm)
-{
-	if (empty())
-		return *this;
-
-	array_sorting<T> sort_job;
-	sort_job.set_f(this->compare);
-
-	switch (algorithm)
-	{
-	case bubble_sort:
-		sort_job.bubbs(values, index_last + 1);
-		break;
-	case selection_sort:
-		sort_job.seles(values, index_last + 1);
-		break;
-	case insertion_sort:
-		sort_job.insrs(values, index_last + 1);
-		break;
-	case merge_sort:
-		sort_job.mrges(values, 0, index_last);
-		break;
-	case heap_sort:
-		sort_job.heaps(values, index_last + 1);
-		break;
-	case quick_sort:
-		sort_job.qucks(values, 0, index_last);
-		break;
-	default:
-		break;
-	}
-
-	return *this;
-}
-
-template <class T>
-array<T>& array<T>::insert(t value, szt index)
-{
-	if (empty())
-	{
-		values[0] = value;
-		index_last++;
-		return *this;
-	}
-
-	if (full())
-	{
-		delete[]values;
-		fatal_error("no more memory");
-	}
-	
-	if (index > index_last + 1)
-		hard_error("bad index");
-	
-	index_last++;
-	for (size_t i = index_last; i > index; i--) // shift right
-		values[i] = values[i - 1];
-	values[index] = value;
-	return *this;
-}
-
-template <class T>
-array<T>& array<T>::remove(szt index)
-{
-	if (empty())
-		return *this;
-
-	if (index >= n)
-		hard_error("bad index");
-	// no punishment for indexing a non-set value?
-	if (index <= index_last)
-		shift_left(index);
-	return *this;
-}
-
-//------------------------------------------------
-// constant methods:
-
-template <class T>
-bool array<T>::operator == (const array<T>& arr) const
-{
-	if (this->n != arr.n)
-		return false;
-	if (this->index_last != arr.index_last)
-		return false;
-
-	if (this->empty() && arr.empty())
-		return true;
-
-	FOR(index_last + 1)
-		if (values[i] != arr.get(i))
-			return false;
-	return true;
-}
-
-template <class T>
-size_t array<T>::get_n() const
-{
-	return n;
-}
-
-template <class T>
-size_t array<T>::get_l() const
-{
-	if (empty())
-		hard_error("no data");
-	return index_last;
-}
-
-template <class T>
-void* array<T>::get_f() const
-{
-	return (void*)compare;
-}
-
-
-template <class T>
-void array<T>::print() const
-{
-	if (empty())
-		return;
-
-	FOR(index_last + 1)
-		std::cout << values[i] << ' ';
-	std::cout << '\n';
-}
-
-template <class T>
-bool array<T>::empty() const
-{
-	return (values[0] == NULL && SZT_ERROR == index_last);
-}
-
-template <class T>
-T array<T>::get(szt index) const
-{
-	if (empty())
-		hard_error("no data");
-
-	if (index > index_last)
-		hard_error("bad index");
-	return values[index];
-}
-
-template <class T>
-bool array<T>::full() const
-{
-	return index_last + 1 == n;
-}
-
-//------------------------------------------------
-// query operations:
-
-template <class T>
-size_t array<T>::search(t value) const
-{
-	if (empty())
-		hard_error("no data");
-	
-	FOR(index_last + 1)
-		if (values[i] == value)
-			return i;
-	return SZT_ERROR;
-}
-
-template <class T>
-size_t array<T>::minimum() const
-{
-	if (empty())
-		hard_error("no data");
-
-	size_t index_minimum = NULL;
-	FOR(index_last + 1)
-		if (compare(values[index_minimum], values[i]))
-			index_minimum = i;
-	return index_minimum;
-}
-
-template <class T>
-size_t array<T>::maximum() const
-{
-	if (empty())
-		hard_error("no data");
-
-	size_t index_maximum = NULL;
-	FOR(index_last + 1)
-		if (compare(values[i], values[index_maximum]))
-			index_maximum = i;
-	return index_maximum;
-}
-
-template <class T>
-size_t array<T>::predcessr(szt index) const
-{
-	if (empty())
-		hard_error("no data");
-	if (index > index_last)
-		hard_error("bad index");
-
-	size_t index_predecessor = SZT_ERROR;
-	FOR(index_last + 1)
-		if (compare(values[index], values[i]))
+		// Friend functions.
+		friend std::ostream& operator<<(std::ostream& out, const array& sequence)
 		{
-			if (index_predecessor == SZT_ERROR)
-				index_predecessor = i;
-			else if (compare(values[i], values[index_predecessor]))
-				index_predecessor = i;
+			return detail::write_elements(out, sequence);
 		}
 
-	return index_predecessor;
-}
-
-template <class T>
-size_t array<T>::successor(szt index) const
-{
-	if (empty())
-		hard_error("no data");
-	if (index > index_last)
-		hard_error("bad index");
-
-	size_t index_successor = SZT_ERROR;
-	FOR(index_last + 1)
-		if (compare(values[i], values[index]))
+		friend std::unique_ptr<T[]> convert(const array& sequence)
 		{
-			if (index_successor == SZT_ERROR)
-				index_successor = i;
-			else if (compare(values[index_successor], values[i]))
-				index_successor = i;
+			return detail::copy_elements<T>(sequence, sequence.length);
 		}
 
-	return index_successor;
-}
+	private:
+		T* values = nullptr;
+		size_type length = 0;
+		size_type allocated = 0;
+		comparator order{};
 
-template <class T>
-T& array<T>::operator [] (szt index)
-{
-	if (empty())
-		hard_error("no data");
-	if (index >= n)
-		hard_error("bad index");
-	if (index > index_last)
-		hard_error("non-set value, use insert method"); // the user has to use insert, for adding a new value, not this operator
-	
-	return values[index];
-};
+		static size_type maximum_capacity() noexcept;
+		void construct_from(const T* source, size_type count);
+		void reserve(const char* operation, size_type required);
+		void reallocate(size_type replacement_capacity);
+		void release() noexcept;
+		void swap(array& other) noexcept;
+		void check_index(const char* operation, size_type index) const;
+		detail::position_range<const T*> stored() const noexcept;
+		size_type index_of(const T* position) const noexcept;
 
-//------------------------------------------------
-// instance synergy:
+	public:
+		static constexpr size_type npos = detail::npos;
+		static constexpr size_type default_capacity = detail::default_capacity;
+	};
 
-template <class T>
-array<T>& array<T>::integrates(const array<T>& arr)
-{
-	if (arr.empty())
-		return *this;
+	//------------------------------------------------
+	// Constructors and destructor.
 
-	if ((this->n + arr.n) * sizeof(T) > INT_MAX)
-		hard_error("too much data on stack");
-	
-	this->n += arr.n;
-	T* new_values = new T[this->n]{};
-	
-	size_t index = 0;
-	FOR(this->index_last + 1)
+	template <class T, class compare>
+	array<T, compare>::~array()
 	{
-		if (index >= this->n) // patch...
-			break;
-		new_values[index] = this->values[i];
-		index++;
-	}
-	
-	FOR(arr.index_last + 1)
-	{
-		if (index >= this->n) // patch...
-			break;
-		new_values[index] = arr.get(i);
-		index++;
+		release();
 	}
 
-	delete[]this->values;
-	this->index_last += (arr.index_last + 1);
-	this->values = new_values;
-	return *this;
-}
+	template <class T, class compare>
+	array<T, compare>::array() noexcept(std::is_nothrow_default_constructible_v<comparator>) {}
 
-template <class T>
-array<T>& array<T>::eliminates(const array<T>& arr)
-{
-	if (this->empty() || arr.empty())
-		return *this;
+	template <class T, class compare>
+	array<T, compare>::array(std::initializer_list<T> initial) : array(initial.begin(), initial.size()) {}
 
-	for (auto value : arr)
-		FOR(this->get_l() + 1)
-		if (this->get(i) == value)
-			this->remove(i);
-	return *this;
-}
-
-template <class T>
-array<T>& array<T>::intersects(const array<T>& arr) // O(n*m), n = |one|, m = |two|. can be done in O(n + m) with a hash table
-{
-	if (this->empty() || arr.empty())
+	template <class T, class compare>
+	array<T, compare>::array(const T* source, size_type count)
 	{
-		*this = array<T>(this->n);
-		return *this;
+		construct_from(source, count);
 	}
-	
-	size_t index = 0;
-	size_t new_n = this->n > arr.n ? this->n : arr.n;
-	T* new_values = new T[new_n]{};
 
-	if (this->empty() || arr.empty())
+	template <class T, class compare>
+	array<T, compare>::array(size_type reserved)
 	{
-		this->clear();
+		if (reserved > maximum_capacity())
+			throw capacity_error("array::array", reserved, maximum_capacity());
+		reallocate(reserved);
+	}
+
+	template <class T, class compare>
+	array<T, compare>::array(const array& other) : order(other.order)
+	{
+		construct_from(other.values, other.length);
+	}
+
+	template <class T, class compare>
+	array<T, compare>::array(array&& other) noexcept(std::is_nothrow_move_constructible_v<comparator>)
+		: values(std::exchange(other.values, nullptr)), length(std::exchange(other.length, 0)),
+		allocated(std::exchange(other.allocated, 0)), order(std::move(other.order)) {}
+
+	//------------------------------------------------
+	// Modifier methods.
+
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::operator=(const array& other)
+	{
+		array copy(other);
+		swap(copy);
 		return *this;
 	}
 
-	if (this->get_l() < arr.get_l())
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::operator=(array&& other) noexcept(std::is_nothrow_move_assignable_v<comparator>)
 	{
-		for (auto key : arr)
-			if (this->search(key) != SZT_ERROR)
-				new_values[index++] = key;
+		if (this == &other)
+			return *this;
+
+		release();
+		values = std::exchange(other.values, nullptr);
+		length = std::exchange(other.length, 0);
+		allocated = std::exchange(other.allocated, 0);
+		order = std::move(other.order);
+		return *this;
 	}
-	else
+
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::clear() noexcept
 	{
-		for (auto key : *this)
-			if (arr.search(key) != SZT_ERROR)
-				new_values[index++] = key;
+		std::destroy_n(values, length);
+		length = 0;
+		return *this;
 	}
 
-	delete[]this->values;
-	this->values = new_values;
-	this->index_last = index - 1;
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::set_compare(comparator replacement)
+	{
+		order = std::move(replacement);
+		return *this;
+	}
 
-	return *this;
+	//------------------------------------------------
+	// Specific methods.
+
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::insert(T value)
+	{
+		return insert(std::move(value), length);
+	}
+
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::insert(T value, size_type index)
+	{
+		if (index > length)
+			throw index_error("array::insert", index, length);
+
+		reserve("array::insert", length + 1);
+		if (index == length)
+		{
+			::new (static_cast<void*>(values + length)) T(std::move(value));
+			++length;
+			return *this;
+		}
+
+		::new (static_cast<void*>(values + length)) T(std::move(values[length - 1]));
+		++length;
+		std::move_backward(values + index, values + length - 2, values + length - 1);
+		values[index] = std::move(value);
+		return *this;
+	}
+
+	template <class T, class compare>
+	array<T, compare>& array<T, compare>::remove(size_type index)
+	{
+		check_index("array::remove", index);
+		std::move(values + index + 1, values + length, values + index);
+		std::destroy_at(values + length - 1);
+		--length;
+		return *this;
+	}
+
+	template <class T, class compare>
+	template <class algorithm, class... options>
+	array<T, compare>& array<T, compare>::sort()
+	{
+		algorithm::template apply<options...>(values, length, order);
+		return *this;
+	}
+
+	//------------------------------------------------
+	// Constant methods.
+
+	template <class T, class compare>
+	bool array<T, compare>::operator==(const array& other) const
+	{
+		return length == other.length && std::equal(values, values + length, other.values);
+	}
+
+	template <class T, class compare>
+	bool array<T, compare>::operator!=(const array& other) const
+	{
+		return !(*this == other);
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::size() const noexcept
+	{
+		return length;
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::capacity() const noexcept
+	{
+		return allocated;
+	}
+
+	template <class T, class compare>
+	bool array<T, compare>::empty() const noexcept
+	{
+		return length == 0;
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::print() const
+	{
+		std::cout << *this << '\n';
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::const_reference array<T, compare>::get(size_type index) const
+	{
+		check_index("array::get", index);
+		return values[index];
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::reference array<T, compare>::operator[](size_type index)
+	{
+		check_index("array::operator[]", index);
+		return values[index];
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::const_reference array<T, compare>::operator[](size_type index) const
+	{
+		check_index("array::operator[]", index);
+		return values[index];
+	}
+
+	//------------------------------------------------
+	// Query operations.
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::search(const_reference value) const
+	{
+		return index_of(detail::find(stored(), value));
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::minimum() const
+	{
+		if (empty())
+			throw empty_error("array::minimum");
+		return index_of(detail::first_extreme(stored(), order));
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::maximum() const
+	{
+		if (empty())
+			throw empty_error("array::maximum");
+		return index_of(detail::first_extreme(stored(), detail::reversed<comparator>(order)));
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::predecessor(size_type index) const
+	{
+		check_index("array::predecessor", index);
+		return index_of(detail::closest_before(stored(), values[index], order));
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::successor(size_type index) const
+	{
+		check_index("array::successor", index);
+		return index_of(detail::closest_before(stored(), values[index], detail::reversed<comparator>(order)));
+	}
+
+	//------------------------------------------------
+	// Iterator methods.
+
+	template <class T, class compare>
+	typename array<T, compare>::iterator array<T, compare>::begin() noexcept
+	{
+		return iterator(values, values + length);
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::iterator array<T, compare>::end() noexcept
+	{
+		return iterator(values + length, values + length);
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::const_iterator array<T, compare>::begin() const noexcept
+	{
+		return const_iterator(values, values + length);
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::const_iterator array<T, compare>::end() const noexcept
+	{
+		return const_iterator(values + length, values + length);
+	}
+
+	//------------------------------------------------
+	// Private helpers.
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::maximum_capacity() noexcept
+	{
+		return std::allocator_traits<std::allocator<T>>::max_size(std::allocator<T>());
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::construct_from(const T* source, size_type count)
+	{
+		if (count == 0)
+			return;
+		if (count > maximum_capacity())
+			throw capacity_error("array::array", count, maximum_capacity());
+
+		reallocate(count);
+		std::uninitialized_copy_n(source, count, values);
+		length = count;
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::reserve(const char* operation, size_type required)
+	{
+		if (required <= allocated)
+			return;
+		if (required > maximum_capacity())
+			throw capacity_error(operation, required, maximum_capacity());
+
+		const size_type grown = std::max({ required, allocated * detail::growth_factor, default_capacity });
+		reallocate(std::min(grown, maximum_capacity()));
+	}
+
+	// Moves the elements into a fresh block; falls back to copying when a throwing move could lose elements.
+	template <class T, class compare>
+	void array<T, compare>::reallocate(size_type replacement_capacity)
+	{
+		std::allocator<T> allocator;
+		T* fresh = allocator.allocate(replacement_capacity);
+		try
+		{
+			if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>)
+				std::uninitialized_move_n(values, length, fresh);
+			else
+				std::uninitialized_copy_n(values, length, fresh);
+		}
+		catch (...)
+		{
+			allocator.deallocate(fresh, replacement_capacity);
+			throw;
+		}
+
+		const size_type kept = length;
+		release();
+		values = fresh;
+		length = kept;
+		allocated = replacement_capacity;
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::release() noexcept
+	{
+		std::destroy_n(values, length);
+		if (values != nullptr)
+			std::allocator<T>().deallocate(values, allocated);
+
+		values = nullptr;
+		length = 0;
+		allocated = 0;
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::swap(array& other) noexcept
+	{
+		using std::swap;
+		swap(values, other.values);
+		swap(length, other.length);
+		swap(allocated, other.allocated);
+		swap(order, other.order);
+	}
+
+	template <class T, class compare>
+	void array<T, compare>::check_index(const char* operation, size_type index) const
+	{
+		if (index >= length)
+			throw index_error(operation, index, length);
+	}
+
+	template <class T, class compare>
+	detail::position_range<const T*> array<T, compare>::stored() const noexcept
+	{
+		return { values, values + length };
+	}
+
+	template <class T, class compare>
+	typename array<T, compare>::size_type array<T, compare>::index_of(const T* position) const noexcept
+	{
+		return position == values + length ? npos : static_cast<size_type>(position - values);
+	}
 }
-
-//------------------------------------------------
-// iterator methods:
-
-template <class T>
-array_iterator<T> array<T>::begin() const
-{
-	if (empty())
-		hard_error("no data");
-	return values[0];
-}
-
-template <class T>
-array_iterator<T> array<T>::end() const
-{
-	if (empty())
-		hard_error("no data"); 
-	return values[index_last + 1];
-}
-
-//------------------------------------------------
-// friend functions:
-
-template <class T>
-T* convert(const array<T>& arr)
-{
-	if (arr.empty())
-		return nullptr;
-
-	T* ptr = new T[arr.index_last + 1];
-	FOR(arr.index_last + 1)
-		ptr[i] = arr.get(i);
-	return ptr;
-}
-
-template <class T>
-std::ostream& operator << (std::ostream& out, const array<T>& arr)
-{
-	if (arr.empty())
-		return out;
-
-	for (auto i : arr)
-		out << i << ' ';
-	out << '\n';
-	return out;
-}
-
-//------------------------------------------------
-// auxiliar utility:
-
-template <class T>
-void array<T>::shift_left(szt left_position)
-{
-	if (empty())
-		fatal_error("nothing to shift");
-
-	for (size_t i = left_position; i < index_last; i++)
-		values[i] = values[i + 1];
-	values[index_last--] = NULL;
-}
-
-template <class T>
-const size_t array<T>::default_array_size = 100;
