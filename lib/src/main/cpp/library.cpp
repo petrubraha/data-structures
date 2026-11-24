@@ -3,3 +3,5 @@
 
 #include "array.hpp"
 #include "linked_list.hpp"
+#include "queue.hpp"
+#include "stack.hpp"

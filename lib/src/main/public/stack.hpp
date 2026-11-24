@@ -1,112 +1,112 @@
 #pragma once
-#include "linked_list.h"
-#include "dev/structure interface/adaptor.h"
+#include <cstddef>
 #include <initializer_list>
+#include <utility>
+#include "linked_list.hpp"
+#include "utils/exceptions.hpp"
 
-template <class T = int>
-class stack : public adaptor<T>
+namespace ds
 {
-public:
-	// constructors:
-	~stack() = default;
-	stack();
-	stack(const std::initializer_list<T>& data);
-	stack(const T* data, const size_t& data_size);
-	stack(const stack<T>& s);
-	stack(const stack<T>&& s);
+	// Last in, first out. Holds a linked list and uses its front as the top, so push and pop are O(1).
+	template <class T>
+	class stack
+	{
+	public:
+		using value_type = T;
+		using size_type = std::size_t;
+		using const_reference = const T&;
 
-	// modifier methods:
-	stack<T>& operator = (const stack<T>& s);
-	
-	// specific methods:
-	stack<T>& push(const T& value);
-	stack<T>& pop();
+		// Constructors and destructor. The source elements are pushed in order, so the last one is on top.
+		~stack() = default;
+		stack() = default;
+		stack(std::initializer_list<T> initial);
+		stack(const T* source, size_type count);
+		stack(const stack& other) = default;
+		stack(stack&& other) noexcept = default;
 
-	// constant methods:
-	T    top() const;
-	bool operator == (const stack<T>& s) const;
-	size_t get_n() const;
-	bool   empty() const;
+		// Modifier methods.
+		stack& operator=(const stack& other) = default;
+		stack& operator=(stack&& other) noexcept = default;
 
-private:
-	// data members:
-	linked_list<T> values;
-};
+		// Specific methods.
+		stack& push(T value);
+		stack& pop();
 
-//------------------------------------------------
-// constructors:
+		// Constant methods.
+		bool operator==(const stack& other) const;
+		bool operator!=(const stack& other) const;
+		size_type size() const noexcept;
+		bool empty() const noexcept;
+		const_reference top() const;
 
-template <class T>
-stack<T>::stack() : values() {};
+	private:
+		linked_list<T> values;
+	};
 
-template <class T>
-stack<T>::stack(const std::initializer_list<T>& data) : values(data) {}
+	//------------------------------------------------
+	// Constructors and destructor.
 
-template <class T>
-stack<T>::stack(const T* data, const size_t& data_size) : values(data, data_size) {}
+	template <class T>
+	stack<T>::stack(std::initializer_list<T> initial) : stack(initial.begin(), initial.size()) {}
 
-template <class T>
-stack<T>::stack(const stack<T>& s) : values(s.values) {}
+	template <class T>
+	stack<T>::stack(const T* source, size_type count)
+	{
+		for (size_type index = 0; index < count; ++index)
+			push(source[index]);
+	}
 
-template <class T>
-stack<T>::stack(const stack<T>&& s) : values(s.values) {}
+	//------------------------------------------------
+	// Specific methods.
 
-//------------------------------------------------
-// modifier methods:
+	template <class T>
+	stack<T>& stack<T>::push(T value)
+	{
+		values.insert(std::move(value), 0);
+		return *this;
+	}
 
-template <class T>
-stack<T>& stack<T>::operator = (const stack<T>& s)
-{
-	this->values = s.values;
-}
+	template <class T>
+	stack<T>& stack<T>::pop()
+	{
+		if (empty())
+			throw empty_error("stack::pop");
+		values.remove(0);
+		return *this;
+	}
 
-//------------------------------------------------
-// specific methods:
+	//------------------------------------------------
+	// Constant methods.
 
-template <class T>
-stack<T>& stack<T>::push(const T& value)
-{
-	auto ptr = new node_list<T>(value);
-	values.insert(ptr, linked_list<T>::head_node);
-	
-	delete ptr;
-	return *this;
-}
+	template <class T>
+	bool stack<T>::operator==(const stack& other) const
+	{
+		return values == other.values;
+	}
 
-template <class T>
-stack<T>& stack<T>::pop()
-{
-	if (empty())
-		hard_error("no data");
-	values.remove(linked_list<T>::head_node);
-	return *this;
-}
+	template <class T>
+	bool stack<T>::operator!=(const stack& other) const
+	{
+		return values != other.values;
+	}
 
-//------------------------------------------------
-// constant methods:
+	template <class T>
+	typename stack<T>::size_type stack<T>::size() const noexcept
+	{
+		return values.size();
+	}
 
-template <class T>
-T stack<T>::top() const
-{
-	if (empty())
-		hard_error("no data");
-	return values.get_head()->get();
-}
+	template <class T>
+	bool stack<T>::empty() const noexcept
+	{
+		return values.empty();
+	}
 
-template <class T>
-bool stack<T>::operator == (const stack<T>& s) const
-{
-	return this->values == s.values;
-}
-
-template <class T>
-size_t stack<T>::get_n() const
-{
-	return values.get_n();
-}
-
-template <class T>
-bool stack<T>::empty() const
-{
-	return values.empty();
+	template <class T>
+	typename stack<T>::const_reference stack<T>::top() const
+	{
+		if (empty())
+			throw empty_error("stack::top");
+		return values.front();
+	}
 }
