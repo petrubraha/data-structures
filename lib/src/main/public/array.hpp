@@ -9,7 +9,12 @@
 #include <type_traits>
 #include <utility>
 #include "iterator/array_iterator.hpp"
+#include "sorting/bubble_sort.hpp"
+#include "sorting/heap_sort.hpp"
+#include "sorting/insertion_sort.hpp"
+#include "sorting/merge_sort.hpp"
 #include "sorting/quick_sort.hpp"
+#include "sorting/selection_sort.hpp"
 #include "utils/constants.hpp"
 #include "utils/conversion.hpp"
 #include "utils/exceptions.hpp"
