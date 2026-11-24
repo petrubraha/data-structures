@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <string>
-#include "utils/exceptions.hpp"
+#include "detail/utils/exceptions.hpp"
 
 TEST(exceptions, index_error_names_operation_index_and_size)
 {

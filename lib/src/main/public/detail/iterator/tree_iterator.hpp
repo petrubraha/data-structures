@@ -1,6 +1,6 @@
 #pragma once
-#include "node/tree_node.hpp"
-#include "utils/exceptions.hpp"
+#include "detail/node/tree_node.hpp"
+#include "detail/utils/exceptions.hpp"
 
 namespace ds
 {

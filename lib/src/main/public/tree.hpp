@@ -6,12 +6,12 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
-#include "iterator/tree_iterator.hpp"
-#include "node/tree_node.hpp"
-#include "policy/balancing.hpp"
-#include "utils/conversion.hpp"
-#include "utils/exceptions.hpp"
-#include "utils/printing.hpp"
+#include "detail/iterator/tree_iterator.hpp"
+#include "detail/node/tree_node.hpp"
+#include "detail/policy/balancing.hpp"
+#include "detail/utils/conversion.hpp"
+#include "detail/utils/exceptions.hpp"
+#include "detail/utils/printing.hpp"
 
 namespace ds::detail
 {
